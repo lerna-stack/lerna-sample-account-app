@@ -30,6 +30,14 @@ services:
       timeout: 2s
       retries: 60
 
+  # Mock server to simulate an external system
+  wiremock-server:
+    image: rodolpheche/wiremock:2.27.2
+    command: ["--https-port", "8443", "--verbose"]
+    ports:
+      - "${WIREMOCK_SERVER_HTTP_BIND:-127.0.0.1:8083}:8080"
+      - "${WIREMOCK_SERVER_HTTPS_BIND:-127.0.0.1:8483}:8443"
+
   sbt-rpmbuild:
     build:
       context: docker/sbt-rpmbuild
