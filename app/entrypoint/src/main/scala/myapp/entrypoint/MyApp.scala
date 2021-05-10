@@ -9,6 +9,7 @@ import akka.stream.Materializer
 import com.typesafe.config.Config
 import lerna.log.AppLogging
 import lerna.util.time.JavaDurationConverters._
+import myapp.gateway.DataSourceSystemMockGateway
 import myapp.presentation.RootRoute
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
@@ -16,10 +17,13 @@ class MyApp(implicit
     val actorSystem: ActorSystem,
     rootRoute: RootRoute,
     config: Config,
+    dataSourceSystemMockGateway: DataSourceSystemMockGateway,
 ) extends AppLogging {
   import actorSystem.dispatcher
 
   def start(): Unit = {
+    dataSourceSystemMockGateway.start()
+
     val privateInternetInterface = config.getString("myapp.private-internet.http.interface")
     val privateInternetPort      = config.getInt("myapp.private-internet.http.port")
 
