@@ -1,0 +1,51 @@
+version: '3'
+
+services:
+
+  mariadb:
+    image: mariadb:10.5.5
+    restart: always
+    ports:
+      - "${MARIADB_BIND_IP_PORT:-127.0.0.1:3306}:3306"
+    volumes:
+      - ./docker/mariadb/initdb:/docker-entrypoint-initdb.d
+    environment:
+      TZ: Asia/Tokyo
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: "myapp"
+      MYSQL_USER: "dbuser"
+      MYSQL_PASSWORD: "dbpass"
+
+  cassandra:
+    build:
+      context: docker/cassandra
+    ports:
+      - "${CASSANDRA_IP_PORT:-127.0.0.1:9042}:9042"
+    environment:
+      MAX_HEAP_SIZE: ${CASSANDRA_MAX_HEAP_SIZE:-256M}
+      HEAP_NEWSIZE: ${CASSANDRA_HEAP_NEWSIZE:-128M}
+    healthcheck:
+      test: ["CMD", "cqlsh", "-u", "cassandra", "-p", "cassandra", "-e", "describe keyspaces"]
+      interval: 3s
+      timeout: 2s
+      retries: 60
+
+  sbt-rpmbuild:
+    build:
+      context: docker/sbt-rpmbuild
+      args:
+        - OPENJDK_VERSION=1.8.0
+        - SBT_VERSION=1.3.13
+        - http_proxy
+        - https_proxy
+    volumes:
+      - ./:/project
+    environment:
+      - http_proxy
+      - https_proxy
+      # gitlab-ci のキャッシュ設定に合わせている
+      - >-
+        SBT_OPTS=
+          -Dsbt.global.base=/project/sbt-cache/sbtboot
+          -Dsbt.boot.directory=/project/sbt-cache/boot
+          -Dsbt.coursier.home=/project/sbt-cache/coursier

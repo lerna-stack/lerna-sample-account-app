@@ -1,0 +1,14 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern> %highlight(%-5level) %logger{10} | %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="slick.jdbc.JdbcBackend.statement"     level="${logging.sql:-warn}"/>
+    <logger name="slick.jdbc.JdbcBackend.parameter"     level="${logging.sql:-warn}"/>
+    <logger name="slick.jdbc.StatementInvoker.result"   level="${logging.sql:-warn}"/>
+    <logger name="Codegen"                              level="info"/>
+    <root level="warn">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

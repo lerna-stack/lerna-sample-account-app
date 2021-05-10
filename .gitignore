@@ -1,0 +1,22 @@
+### Scala, Java
+target/
+lib_managed/
+src_managed/
+
+### IntelliJ IDEA
+.idea
+
+### docker-compose
+.env
+
+### kamon java agent
+**/native/
+
+### log
+/log/
+
+#### Build Server Protocol
+.bsp/sbt.json
+
+## Cache (docker/sbt-rpmbuild)
+sbt-cache/
