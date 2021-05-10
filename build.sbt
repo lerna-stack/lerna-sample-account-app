@@ -89,6 +89,7 @@ lazy val `gateway` = (project in file("app/gateway"))
       Akka.stream,
       AkkaHttp.http,
       AkkaHttp.sprayJson,
+      WireMock.wireMock,
       Akka.testKit         % Test,
       AkkaHttp.httpTestKit % Test,
     ),
