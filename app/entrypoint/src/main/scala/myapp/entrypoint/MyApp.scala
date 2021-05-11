@@ -9,6 +9,7 @@ import akka.stream.Materializer
 import com.typesafe.config.Config
 import lerna.log.AppLogging
 import lerna.util.time.JavaDurationConverters._
+import myapp.adapter.DepositImporterApplication
 import myapp.gateway.DataSourceSystemMockGateway
 import myapp.presentation.RootRoute
 
@@ -18,11 +19,13 @@ class MyApp(implicit
     rootRoute: RootRoute,
     config: Config,
     dataSourceSystemMockGateway: DataSourceSystemMockGateway,
+    depositImporterApplication: DepositImporterApplication,
 ) extends AppLogging {
   import actorSystem.dispatcher
 
   def start(): Unit = {
     dataSourceSystemMockGateway.start()
+    depositImporterApplication.importDeposit()
 
     val privateInternetInterface = config.getString("myapp.private-internet.http.interface")
     val privateInternetPort      = config.getInt("myapp.private-internet.http.port")

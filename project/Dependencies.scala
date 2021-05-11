@@ -43,6 +43,9 @@ object Dependencies {
     val testKit          = "com.typesafe.akka" %% "akka-testkit"            % Versions.akka
     val streamTestKit    = "com.typesafe.akka" %% "akka-stream-testkit"     % Versions.akka
     val multiNodeTestKit = "com.typesafe.akka" %% "akka-multi-node-testkit" % Versions.akka
+    val streamTyped      = "com.typesafe.akka" %% "akka-stream-typed"       % Versions.akka
+    val clusterTyped     = "com.typesafe.akka" %% "akka-cluster-typed"      % Versions.akka
+    val persistenceTyped = "com.typesafe.akka" %% "akka-persistence-typed"  % Versions.akka
   }
 
   object AkkaHttp {
