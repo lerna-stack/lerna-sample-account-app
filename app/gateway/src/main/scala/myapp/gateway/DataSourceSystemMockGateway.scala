@@ -1,6 +1,7 @@
 package myapp.gateway
 
 import com.github.tomakehurst.wiremock.client.WireMock
+import scala.jdk.CollectionConverters._
 
 class DataSourceSystemMockGateway(config: GatewayConfig) {
 
@@ -14,11 +15,40 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
     import WireMock._
     wireMock.resetMappings()
     wireMock.register(
-      get("/test").willReturn(
-        aResponse()
-          .withHeader("Content-Type", "test/plain")
-          .withBody("Hello"),
-      ),
+      get(urlPathEqualTo("/data"))
+        .atPriority(2)
+        .withQueryParam("cursor", matching("(0|[1-9][0-9]*)"))
+        .withQueryParam("limit", matching("[1-9][0-9]*"))
+        .willReturn(
+          ok()
+            .withBody {
+              """
+              {
+                 "data": [
+                    {{#each parameters.numbers ~}}
+                    { "cursor": {{@index}}, "accountNo": "{{randomValue length=10 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
+                    {{/each}}
+                 ]
+              }
+              """
+            }.withTransformerParameter("numbers", (1 to 1000).asJava),
+        ),
+    )
+    wireMock.register(
+      get(urlPathEqualTo("/data"))
+        .atPriority(1)
+        .withQueryParam("cursor", matching("1000"))
+        .withQueryParam("limit", matching("[1-9][0-9]*"))
+        .willReturn(
+          okJson {
+            """
+            {
+               "data": [
+               ]
+            }
+            """
+          },
+        ),
     )
   }
 }
