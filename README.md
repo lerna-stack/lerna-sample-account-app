@@ -1,4 +1,8 @@
-# Template
+# lerna-sample-account-app
+
+## Archtecture
+
+![](./docs/images/archtecture.drawio.png)
 
 ## Provisioning environment
 
