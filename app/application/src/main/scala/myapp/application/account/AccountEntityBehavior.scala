@@ -1,7 +1,9 @@
 package myapp.application.account
 
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
-import akka.actor.typed.{ ActorRef, Behavior }
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.{ ClusterSharding, Entity, EntityTypeKey }
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import myapp.adapter.Cursor
@@ -25,26 +27,29 @@ object AccountEntityBehavior {
       copy(balance = this.balance + amount, latestCursor = Option(cursor))
     }
 
-    def onCommand(message: Command, context: ActorContext[Command]): Effect[Event, Account] = message match {
-      case deposit: Deposit =>
-        if (latestCursor.forall(_.lowerThan(deposit.cursor))) {
-          Effect
-            .persist[Event, Account](Deposited(deposit.cursor, deposit.amount))
-            .thenRun { newState =>
-              context.log.info(s"[${deposit.cursor}] Deposited: +${deposit.amount} (new balance: ${newState.balance})")
-            }
-            .thenReply(deposit.replyTo)(newState => DepositReply(deposit.cursor, newState.balance))
-        } else {
-          Effect
-            .none[Event, Account]
-            .thenRun { _ =>
-              context.log.info(
-                s"[${deposit.cursor}] Ignore - This deposit has already been processed: (amount: ${deposit.amount})",
-              )
-            }
-            .thenReply(deposit.replyTo)(state => DepositReply(deposit.cursor, state.balance))
-        }
-    }
+    def onCommand(message: Command, context: ActorContext[Command], entityId: String): Effect[Event, Account] =
+      message match {
+        case deposit: Deposit =>
+          if (latestCursor.forall(_.lowerThan(deposit.cursor))) {
+            Effect
+              .persist[Event, Account](Deposited(deposit.cursor, deposit.amount))
+              .thenRun { newState =>
+                context.log.info(
+                  s"[No:$entityId][${deposit.cursor}] Deposited: +${deposit.amount} (new balance: ${newState.balance})",
+                )
+              }
+              .thenReply(deposit.replyTo)(newState => DepositReply(deposit.cursor, newState.balance))
+          } else {
+            Effect
+              .none[Event, Account]
+              .thenRun { _ =>
+                context.log.info(
+                  s"[No:$entityId][${deposit.cursor}] Ignore - This deposit has already been processed: (amount: ${deposit.amount})",
+                )
+              }
+              .thenReply(deposit.replyTo)(state => DepositReply(deposit.cursor, state.balance))
+          }
+      }
 
     def applyEvent(event: Event): Account = event match {
       case deposited: Deposited =>
@@ -56,8 +61,15 @@ object AccountEntityBehavior {
     EventSourcedBehavior[Command, Event, Account](
       persistenceId = PersistenceId(entityType, entityId),
       emptyState = Account(balance = BigDecimal(0), latestCursor = None),
-      commandHandler = (state, command) => state.onCommand(command, context),
+      commandHandler = (state, command) => state.onCommand(command, context, entityId),
       eventHandler = (state, event) => state.applyEvent(event),
     )
   }
+
+  val TypeKey: EntityTypeKey[AccountEntityBehavior.Command] = EntityTypeKey("Account")
+
+  def shardRegion(system: ActorSystem[_]): ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]] =
+    ClusterSharding(system).init(Entity(TypeKey) { entityContext =>
+      AccountEntityBehavior(TypeKey.name, entityContext.entityId)
+    })
 }

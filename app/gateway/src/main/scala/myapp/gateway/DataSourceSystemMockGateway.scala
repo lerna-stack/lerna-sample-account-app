@@ -27,7 +27,7 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
               {
                  "data": [
                     {{#each parameters.numbers ~}}
-                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=10 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
+                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=1 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
                     {{/each}}
                  ]
               }
@@ -47,7 +47,7 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
               {
                  "data": [
                     {{#each parameters.numbers ~}}
-                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=10 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
+                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=1 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
                     {{/each}}
                  ]
               }
@@ -67,7 +67,7 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
               {
                  "data": [
                     {{#each parameters.numbers ~}}
-                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=10 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
+                    { "cursor": "{{this}}", "accountNo": "{{randomValue length=1 type='NUMERIC'}}", "amount": 1000 }{{#unless @last}},{{/unless}}
                     {{/each}}
                  ]
               }

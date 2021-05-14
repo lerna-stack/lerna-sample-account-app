@@ -8,8 +8,8 @@ import myapp.application.account.AccountEntityBehavior
 class DepositImporterApplicationImpl(system: ActorSystem, depositImportingManager: DepositImportingManager)
     extends DepositImporterApplication {
 
-  private[this] val entity  = system.spawn(AccountEntityBehavior("bank", "0001"), "entity")
-  private[this] val manager = system.spawn(depositImportingManager.createBehavior(entity), "manager")
+  private[this] val region  = AccountEntityBehavior.shardRegion(system.toTyped)
+  private[this] val manager = system.spawn(depositImportingManager.createBehavior(region), "manager")
 
   override def importDeposit(): Unit = {
     manager ! DepositImportingManager.Import()

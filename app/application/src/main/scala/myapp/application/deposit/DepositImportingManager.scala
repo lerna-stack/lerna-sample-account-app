@@ -3,6 +3,7 @@ package myapp.application.deposit
 import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.stream.CompletionStrategy
 import akka.stream.scaladsl.{ Keep, Sink }
 import akka.stream.typed.scaladsl.{ ActorFlow, ActorSource }
@@ -17,7 +18,7 @@ import scala.util.{ Failure, Success }
 private[deposit] object DepositImportingManager {
 
   final class Setup(
-      val region: ActorRef[AccountEntityBehavior.Command],
+      val region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]],
   )
 
   sealed trait Command
@@ -35,7 +36,7 @@ private[deposit] class DepositImportingManager(
 ) {
   import DepositImportingManager._
 
-  def createBehavior(region: ActorRef[AccountEntityBehavior.Command]): Behavior[Command] =
+  def createBehavior(region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]]): Behavior[Command] =
     ready(
       new Setup(
         region,
@@ -104,7 +105,7 @@ private[deposit] class DepositImportingManager(
   private[this] def start(
       depositSource: ActorRef[DepositSourceBehavior.Command],
       cursorStore: ActorRef[DepositCursorStoreBehavior.Command],
-      region: ActorRef[AccountEntityBehavior.Command],
+      region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]],
   )(implicit system: ActorSystem[_]): Future[Done] = {
 
     val source =
@@ -127,8 +128,8 @@ private[deposit] class DepositImportingManager(
         .collectType[DepositSourceBehavior.Deposits]
         .mapConcat(_.deposits.toVector)
         .throttle(100, per = 1.second)
-        .via(ActorFlow.ask(region) { (e, replyTo) =>
-          AccountEntityBehavior.Deposit(e.cursor, e.amount, replyTo)
+        .via(ActorFlow.ask(region) { (e, replyTo: ActorRef[AccountEntityBehavior.DepositReply]) =>
+          ShardingEnvelope(e.accountNo, AccountEntityBehavior.Deposit(e.cursor, e.amount, replyTo))
         })
         .collectType[AccountEntityBehavior.DepositReply]
         .map { deposited =>
