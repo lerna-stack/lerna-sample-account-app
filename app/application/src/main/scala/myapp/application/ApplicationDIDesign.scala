@@ -1,6 +1,7 @@
 package myapp.application
 
 import myapp.adapter.DepositImporterApplication
+import myapp.application.deposit.DepositImporterApplicationImpl
 import wvlet.airframe.{ newDesign, Design }
 
 /** Presentation プロジェクト内のコンポーネントの [[wvlet.airframe.Design]] を定義する

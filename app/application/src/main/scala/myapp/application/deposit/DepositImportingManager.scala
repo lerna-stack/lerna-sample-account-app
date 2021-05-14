@@ -1,23 +1,23 @@
-package myapp.application
+package myapp.application.deposit
 
 import akka.Done
-import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.stream.CompletionStrategy
 import akka.stream.scaladsl.{ Keep, Sink }
 import akka.stream.typed.scaladsl.{ ActorFlow, ActorSource }
 import akka.util.Timeout
 import myapp.adapter.Cursor
+import myapp.application.account.AccountEntityBehavior
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
-object DepositImportingManager {
+private[deposit] object DepositImportingManager {
 
   final class Setup(
       val region: ActorRef[AccountEntityBehavior.Command],
-      val cursorStore: ActorRef[DepositCursorStoreBehavior.Command],
   )
 
   sealed trait Command
@@ -29,20 +29,18 @@ object DepositImportingManager {
   final case class ImportingFailed(ex: Throwable)    extends Command
 }
 
-class DepositImportingManager(
+private[deposit] class DepositImportingManager(
     depositCursorStoreBehavior: DepositCursorStoreBehavior,
     depositSourceBehavior: DepositSourceBehavior,
 ) {
   import DepositImportingManager._
 
-  def createBehavior(region: ActorRef[AccountEntityBehavior.Command]): Behavior[Command] = Behaviors.setup { context =>
+  def createBehavior(region: ActorRef[AccountEntityBehavior.Command]): Behavior[Command] =
     ready(
       new Setup(
         region,
-        context.spawn(depositCursorStoreBehavior.createBehavior(), "cursorStore"),
       ),
     )
-  }
 
   private[this] def ready(setup: Setup): Behavior[Command] =
     Behaviors.setup { context =>
@@ -51,11 +49,12 @@ class DepositImportingManager(
       Behaviors.receiveMessage {
 
         case Import() =>
-          context.ask(setup.cursorStore, DepositCursorStoreBehavior.GetCursor) {
+          val cursorStore = context.spawn(depositCursorStoreBehavior.createBehavior(), "cursorStore")
+          context.ask(cursorStore, DepositCursorStoreBehavior.GetCursor) {
             case Success(value) => GotCursor(value.cursor)
             case Failure(ex)    => GetCursorFailed(ex)
           }
-          importing(setup)
+          importing(setup, cursorStore)
 
         case _: GotCursor          => Behaviors.unhandled
         case _: GetCursorFailed    => Behaviors.unhandled
@@ -66,6 +65,7 @@ class DepositImportingManager(
 
   private[this] def importing(
       setup: Setup,
+      cursorStore: ActorRef[DepositCursorStoreBehavior.Command],
   ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.receiveMessage {
@@ -73,7 +73,7 @@ class DepositImportingManager(
         case GotCursor(cursor) =>
           context.log.info("Got cursor: {}", cursor)
           val source = context.spawn(depositSourceBehavior.createBehavior(cursor), "source")
-          context.pipeToSelf(start(source, setup.cursorStore, setup.region)(context.system)) {
+          context.pipeToSelf(start(source, cursorStore, setup.region)(context.system)) {
             case Success(_)  => ImportingSucceeded()
             case Failure(ex) => ImportingFailed(ex)
           }
@@ -82,14 +82,17 @@ class DepositImportingManager(
         case GetCursorFailed(ex) =>
           context.log.warn("Get cursor failed", ex)
           context.scheduleOnce(3.seconds, context.self, Import()) // retry
+          cursorStore ! DepositCursorStoreBehavior.Stop()
           ready(setup)
 
         case ImportingSucceeded() =>
           context.log.info("Importing completed")
+          cursorStore ! DepositCursorStoreBehavior.Stop()
           ready(setup)
 
         case ImportingFailed(ex) =>
           context.log.warn("Importing failed", ex)
+          cursorStore ! DepositCursorStoreBehavior.Stop()
           ready(setup)
 
         case Import() =>
@@ -105,9 +108,9 @@ class DepositImportingManager(
   )(implicit system: ActorSystem[_]): Future[Done] = {
 
     val source =
-      ActorSource.actorRefWithBackpressure[DepositSourceBehavior.DemandReply, DepositSourceBehavior.Demand](
+      ActorSource.actorRefWithBackpressure[DepositSourceBehavior.DemandReply, DepositSourceBehavior.Ack](
         ackTo = depositSource,
-        ackMessage = DepositSourceBehavior.Demand(),
+        ackMessage = DepositSourceBehavior.Ack(),
         completionMatcher = {
           // バッファにある要素を処理してから終了
           case _: DepositSourceBehavior.Completed => CompletionStrategy.draining
@@ -123,18 +126,18 @@ class DepositImportingManager(
       source
         .collectType[DepositSourceBehavior.Deposits]
         .mapConcat(_.deposits.toVector)
-        .throttle(1, per = 1.second)
-        .via(ActorFlow.ask(parallelism = 1)(region) { (e, replyTo) =>
+        .throttle(100, per = 1.second)
+        .via(ActorFlow.ask(region) { (e, replyTo) =>
           AccountEntityBehavior.Deposit(e.cursor, e.amount, replyTo)
         })
-        .collectType[AccountEntityBehavior.Deposited]
+        .collectType[AccountEntityBehavior.DepositReply]
         .map { deposited =>
           cursorStore ! DepositCursorStoreBehavior.SaveCursor(deposited.cursor)
           deposited
         }
         .toMat(Sink.ignore)(Keep.both)
         .run()
-    depositSource ! DepositSourceBehavior.Start(receiver)
+    depositSource ! DepositSourceBehavior.Start(limit = 1000, receiver)
     done
   }
 }

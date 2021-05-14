@@ -57,9 +57,8 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
     )
     wireMock.register(
       get(urlPathEqualTo("/data"))
-        .atPriority(2)
         .withQueryParam("cursor", matching("2000"))
-        .withQueryParam("limit", matching("[1-9][0-9]*"))
+        .withQueryParam("limit", matching("1000"))
         .willReturn(
           ok()
             .withHeader("Content-Type", "application/json")
@@ -74,6 +73,23 @@ class DataSourceSystemMockGateway(config: GatewayConfig) {
               }
               """
             }.withTransformerParameter("numbers", (2001 to 2010).asJava),
+        ),
+    )
+    wireMock.register(
+      get(urlPathEqualTo("/data"))
+        .withQueryParam("cursor", matching("2010"))
+        .withQueryParam("limit", matching("1000"))
+        .willReturn(
+          ok()
+            .withHeader("Content-Type", "application/json")
+            .withBody {
+              """
+              {
+                 "data": [
+                 ]
+              }
+              """
+            },
         ),
     )
   }

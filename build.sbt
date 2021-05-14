@@ -23,6 +23,8 @@ ThisBuild / javaOptions in run ++= distinctJavaOptions(
     "-Dmyapp.server-mode=DEV",
     "-Dakka.persistence.cassandra.journal.keyspace-autocreate=true",
     "-Dakka.persistence.cassandra.journal.tables-autocreate=true",
+    "-Dakka.persistence.cassandra.snapshot.keyspace-autocreate=true",
+    "-Dakka.persistence.cassandra.snapshot.tables-autocreate=true",
   ),
 )
 // fork先にはシステムプロパティが引き継がれないため
