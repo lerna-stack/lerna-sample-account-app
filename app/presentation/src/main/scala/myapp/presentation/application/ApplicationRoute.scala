@@ -9,7 +9,7 @@ class ApplicationRoute(depositImporterApplication: DepositImporterApplication) {
   def route: Route = concat(
     path("import") {
       depositImporterApplication.importDeposit()
-      complete(StatusCodes.OK -> "OK")
+      complete(StatusCodes.Accepted -> "Accepted")
     },
   )
 }
