@@ -4,12 +4,15 @@ import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.{ ClusterSharding, Entity, EntityTypeKey }
+import akka.persistence.typed.PersistenceId
 import akka.stream.CompletionStrategy
 import akka.stream.scaladsl.{ Keep, Sink }
 import akka.stream.typed.scaladsl.{ ActorFlow, ActorSource }
 import akka.util.Timeout
 import myapp.adapter.Cursor
 import myapp.application.account.AccountEntityBehavior
+import myapp.application.serialize.KryoSerializable
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -19,15 +22,18 @@ private[deposit] object DepositImportingManager {
 
   final class Setup(
       val region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]],
+      val entityId: String,
   )
 
   sealed trait Command
 
-  final case class Import()                          extends Command
+  final case class Import()                          extends Command with KryoSerializable
   final case class GotCursor(cursor: Option[Cursor]) extends Command
   final case class GetCursorFailed(ex: Throwable)    extends Command
   final case class ImportingSucceeded()              extends Command
   final case class ImportingFailed(ex: Throwable)    extends Command
+
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey("DepositImportingManager")
 }
 
 private[deposit] class DepositImportingManager(
@@ -36,10 +42,22 @@ private[deposit] class DepositImportingManager(
 ) {
   import DepositImportingManager._
 
-  def createBehavior(region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]]): Behavior[Command] =
+  def shardRegion(
+      system: ActorSystem[_],
+      region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]],
+  ): ActorRef[ShardingEnvelope[Command]] =
+    ClusterSharding(system).init(Entity(TypeKey) { entityContext =>
+      createBehavior(region, entityContext.entityId)
+    })
+
+  def createBehavior(
+      region: ActorRef[ShardingEnvelope[AccountEntityBehavior.Command]],
+      entityId: String,
+  ): Behavior[Command] =
     ready(
       new Setup(
         region,
+        entityId,
       ),
     )
 
@@ -50,7 +68,10 @@ private[deposit] class DepositImportingManager(
       Behaviors.receiveMessage {
 
         case Import() =>
-          val cursorStore = context.spawn(depositCursorStoreBehavior.createBehavior(), "cursorStore")
+          val cursorStore = context.spawn(
+            depositCursorStoreBehavior.createBehavior(PersistenceId.of(TypeKey.name + "CursorStore", setup.entityId)),
+            "cursorStore",
+          )
           context.ask(cursorStore, DepositCursorStoreBehavior.GetCursor) {
             case Success(value) => GotCursor(value.cursor)
             case Failure(ex)    => GetCursorFailed(ex)

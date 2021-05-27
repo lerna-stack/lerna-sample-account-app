@@ -50,10 +50,10 @@ import myapp.application.deposit.DepositCursorStoreBehavior._
 
 private[deposit] class DepositCursorStoreBehavior {
 
-  def createBehavior(): Behavior[Command] = {
+  def createBehavior(persistenceId: PersistenceId): Behavior[Command] = {
     EventSourcedBehavior
       .withEnforcedReplies[Command, Event, State](
-        persistenceId = PersistenceId.ofUniqueId("test" /*TODO: set*/ ),
+        persistenceId = persistenceId,
         emptyState = State(latestCursor = None),
         commandHandler = (state, command) => state.onCommand(command),
         eventHandler = (state, event) => state.applyEvent(event),
