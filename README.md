@@ -2,17 +2,49 @@
 
 ## Archtecture
 
+### コンポーネント
+
+- **timer**
+    - cron や systemd.timer などの定期的に処理を起動する仕組み
+- **`DepositRoute`**
+    - 外部から HTTP リクエストでデータ取り込みの指示を受け付ける
+- **`DepositImportingManager`**
+    - データ取り込みのライフサイクル（起動・終了など）を管理する
+- **`DepositCursorStore`**
+    - カーソル（データの範囲を表す情報）を保存する
+- **`AccountEntity`**
+    - 口座の状態を持つ Entity。入金のコマンドを受け付ける
+- **`DepositPoolSystem`**
+    - 入金データを溜め込むサブシステム
+    - 本サンプルでは WireMock を使って実現
+- **`DepositSource`**
+    - `DepositPoolSystem` からデータを取得する
+- **`DepositImportingStream`**
+    - `DepositSource` から受け取ったデータを `AccountEntity` にコマンドで連携する
+    - 連携するコマンドの量を流量制御する
+    - `AccountEntity` のレスポンスが遅延した場合は排圧制御をかける
+    
+### 処理の流れ
+
 ![](./docs/images/archtecture.drawio.png)
+
+- ① 特定のタイミングでデータ取り込み用の API をコール
+- ② `DepositImportingManager` にインポートが指示されます
+- ③④ 保存されたカーソルがあるか確認
+- ⑤ カーソルがあれば指定して `DepositImportingStream` (akka-stream) を起動
+- ⑥⑨ `DepositSource` からデータを受け取る
+- ⑦⑧ `DepositSource` は `DepositPoolSystem` から非同期でデータ取得
+- ⑪⑫ 取得したデータを元に `AccountEntity` へコマンド送信
 
 ## Provisioning environment
 
 `docker-compse` を使用して開発環境を準備できます。
 
 開発環境を構築するには次のコマンドを実行します。  
-これによって `MariaDB` と `Cassandra` が起動します。
+これによって `MariaDB` と `Cassandra`、`WireMockServer` が起動します。
 
 ```shell
-docker-compose up
+docker-compose up -d
 ```
 
 開発環境で動くサーバ(`MariaDB`等)を停止するには次のコマンドを実行します。
@@ -45,7 +77,7 @@ sbt clean test:compile test
 ./scripts/start-app-1.sh
 ```
 
-```
+```shell
 # アプリサーバ2を起動します
 ./scripts/start-app-2.sh
 ```
@@ -55,8 +87,9 @@ sbt clean test:compile test
 アプリサーバ1(`127.0.0.1`)にリクエストを送る例です。
 
 ```shell
-# OKが返ります
-curl --silent --noproxy "*" http://127.0.0.1:9001/index
+# データ取り込みを起動します
+# データ取り込みは非同期で行われるため、すぐに応答が返ります
+curl --silent --noproxy "*" http://127.0.0.1:9001/import
 
 # アプリバージョンを取得します
 # デフォルトでは unknown になっています
@@ -72,7 +105,7 @@ curl --silent --noproxy "*" http://127.0.0.1:9002/commit-hash
 アプリサーバ2(`127.0.0.2`)にリクエストを送る場合はIPアドレスを変更します。
 
 ```
-curl --silent --noproxy "*" http://127.0.0.2:9001/index
+curl --silent --noproxy "*" http://127.0.0.2:9001/import
 curl --silent --noproxy "*" http://127.0.0.2:9002/version
 curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 ```
