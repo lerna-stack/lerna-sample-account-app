@@ -36,6 +36,14 @@
 - ⑦⑧ `DepositSource` は `DepositPoolSystem` から非同期でデータ取得
 - ⑪⑫ 取得したデータを元に `AccountEntity` へコマンド送信
 
+### 分散方式
+
+![](./docs/images/distribution.drawio.png)
+
+- `DepositImportingManager` 及びそれが管理するコンポーネントは ClusterSharding で各ノードに分散配置される
+- `AccountEntity` も各ノードに分散配置される（`DepositImportingManager` とは別系統）
+- 1回の `import` で処理を行う `DepositImportingManager` は一つで、そこから各ノードに配置された `AccountEntity` にコマンドが送信される
+
 ## Provisioning environment
 
 `docker-compse` を使用して開発環境を準備できます。
