@@ -99,25 +99,25 @@ sbt clean test:compile test
 ```shell
 # データ取り込みを起動します
 # データ取り込みは非同期で行われるため、すぐに応答が返ります
-curl --silent --noproxy "*" http://127.0.0.1:9001/import
+curl --silent --noproxy "*" 'http://127.0.0.1:9001/import'
 
 # アプリバージョンを取得します
 # デフォルトでは unknown になっています
 # 設定ファイルや環境変数で上書きすることができます
-curl --silent --noproxy "*" http://127.0.0.1:9002/version
+curl --silent --noproxy "*" 'http://127.0.0.1:9002/version'
 
 # アプリコミットハッシュを取得します
 # デフォルトでは unknown になっています
 # 設定ファイルや環境変数で上書きすることができます
-curl --silent --noproxy "*" http://127.0.0.1:9002/commit-hash
+curl --silent --noproxy "*" 'http://127.0.0.1:9002/commit-hash'
 ```
 
 アプリサーバ2(`127.0.0.2`)にリクエストを送る場合はIPアドレスを変更します。
 
-```
-curl --silent --noproxy "*" http://127.0.0.2:9001/import
-curl --silent --noproxy "*" http://127.0.0.2:9002/version
-curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
+```shell
+curl --silent --noproxy "*" 'http://127.0.0.2:9001/import'
+curl --silent --noproxy "*" 'http://127.0.0.2:9002/version'
+curl --silent --noproxy "*" 'http://127.0.0.2:9002/commit-hash'
 ```
 
 ポート番号 `9001` は ユーザ向け機能、  
