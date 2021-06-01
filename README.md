@@ -92,6 +92,8 @@ sbt clean test:compile test
 
 ## API
 
+### アプリサーバー
+
 アプリサーバ1(`127.0.0.1`)にリクエストを送る例です。
 
 ```shell
@@ -121,6 +123,18 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 ポート番号 `9001` は ユーザ向け機能、  
 ポート番号 `9002` は 管理用機能を定義することを想定しています。
 
+### WireMockServer
+
+WireMockServer にリクエストを送る例です。
+
+WireMockServer のスタブはアプリによって設定されるため、事前に `sbt run` を実行しておいてください。
+
+```shell
+# 入金データを返します
+# cursor でデータの開始位置、limit で取得するデータの最大数を指定できます
+# cursor を指定しない場合は最も古いデータから limit 分だけデータを返します
+curl --silent --noproxy "*" 'http://127.0.0.1:8083/data?limit=10&cursor=100'
+```
 
 ## テストカバレッジ を取得する
 
