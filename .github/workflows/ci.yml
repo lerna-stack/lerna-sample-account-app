@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  SBT_SCALAC_STRICT_WARNINGS: true
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up JDK
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'zulu'
+        java-version: 11
+
+    # https://www.scala-sbt.org/1.x/docs/GitHub-Actions-with-sbt.html#Caching
+    - name: Coursier cache
+      uses: coursier/cache-action@v5
+
+    - name: Check code format
+      run: sbt scalafmtSbtCheck scalafmtCheckAll
+
+    # Detect compilation errors early
+    - name: Compile
+      run: sbt clean compile test:compile
+
+    - name: Run tests
+      run: sbt test
+
+      # https://www.scala-sbt.org/1.x/docs/GitHub-Actions-with-sbt.html#Caching
+    - name: Clean files for caching
+      run: |
+        rm -rf "$HOME/.ivy2/local" || true
+        find $HOME/Library/Caches/Coursier/v1        -name "ivydata-*.properties" -delete || true
+        find $HOME/.ivy2/cache                       -name "ivydata-*.properties" -delete || true
+        find $HOME/.cache/coursier/v1                -name "ivydata-*.properties" -delete || true
+        find $HOME/.sbt                              -name "*.lock"               -delete || true
