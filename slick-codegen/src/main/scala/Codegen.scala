@@ -8,7 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{ Failure, Success }
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 @SuppressWarnings(
   Array(
@@ -23,7 +23,7 @@ object Codegen extends App {
 
   val config                         = ConfigFactory.load().getConfig("slick.codegen")
   val dbConfig                       = DatabaseConfig.forConfig[JdbcProfile]("", config)
-  val excludeTableNames: Seq[String] = config.getStringList("excludeTableNames").asScala
+  val excludeTableNames: Seq[String] = config.getStringList("excludeTableNames").asScala.toSeq
   import dbConfig._
 
   val tables = profile.defaultTables.map(_.filterNot { table =>

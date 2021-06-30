@@ -6,7 +6,7 @@ ThisBuild / name := "myapp"
 ThisBuild / description := "description"
 ThisBuild / version := "1.0.0"
 ThisBuild / organization := "organization"
-ThisBuild / scalaVersion := "2.12.12"
+ThisBuild / scalaVersion := "2.13.6"
 ThisBuild / scalacOptions ++= Seq(
   "-deprecation",
   "-feature",
@@ -35,6 +35,9 @@ ThisBuild / fork in Test := true
 // forkプロセスのstdoutをこのプロセスのstdout,stderrをこのプロセスのstderrに転送する
 // デフォルトのLoggedOutputでは、airframeやkamonが標準エラーに出力するログが[error]とプリフィクスがつき紛らわしいため
 ThisBuild / outputStrategy := Some(StdoutOutput)
+
+// TODO SNAPSHOT を使用しなくなったら SNAPSHOT用の resolver は削除すること
+ThisBuild / resolvers += Resolver.sonatypeRepo("snapshots")
 
 lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging, JavaServerAppPackaging, RpmPlugin, SystemdPlugin)
@@ -69,7 +72,7 @@ lazy val `presentation` = (project in file("app/presentation"))
       Akka.stream,
       AkkaHttp.http,
       AkkaHttp.sprayJson,
-      Akka.testKit         % Test,
+      Akka.actorTestKit    % Test,
       AkkaHttp.httpTestKit % Test,
     ),
   )
@@ -89,7 +92,7 @@ lazy val `gateway` = (project in file("app/gateway"))
       Akka.stream,
       AkkaHttp.http,
       AkkaHttp.sprayJson,
-      Akka.testKit         % Test,
+      Akka.actorTestKit    % Test,
       AkkaHttp.httpTestKit % Test,
     ),
   )
@@ -115,6 +118,7 @@ lazy val `application` = (project in file("app/application"))
   .settings(
     name := "application",
     libraryDependencies ++= Seq(
+      Lerna.akkaEntityReplication,
       Lerna.utilSequence,
       Lerna.utilAkka,
       Lerna.management,
@@ -123,16 +127,18 @@ lazy val `application` = (project in file("app/application"))
       Akka.stream,
       Akka.persistence,
       Akka.cluster,
-      Akka.clusterTools,
       Akka.clusterSharding,
-      Akka.slf4j,
+      Akka.clusterTools,
       Akka.persistenceQuery,
       AkkaPersistenceCassandra.akkaPersistenceCassandra,
+      AkkaProjection.eventsourced,
+      AkkaProjection.slick,
       Kryo.kryo,
       SprayJson.sprayJson,
-      Akka.testKit          % Test,
-      Akka.multiNodeTestKit % Test,
-      Akka.streamTestKit    % Test,
+      Akka.actorTestKit       % Test,
+      Akka.multiNodeTestKit   % Test,
+      Akka.streamTestKit      % Test,
+      Akka.persistenceTestKit % Test,
     ),
   )
 
@@ -192,6 +198,7 @@ lazy val `testkit` = (project in file("app/testkit"))
   .settings(
     name := "testkit",
     libraryDependencies ++= Seq(
+      Akka.actor,
       Lerna.util,
       Lerna.testkit,
       Expecty.expecty,
@@ -268,7 +275,7 @@ lazy val wartremoverSettings = Def.settings(
 )
 
 lazy val coverageSettings = Def.settings(
-  coverageMinimum := 80,
+  coverageMinimumStmtTotal := 80,
   coverageFailOnMinimum := false,
   // You can exclude classes from being considered for coverage measurement by
   // providing semicolon-separated list of regular expressions.
@@ -340,4 +347,4 @@ fetchGitCommitHash := {
   "git rev-parse HEAD".!!.trim
 }
 
-addCommandAlias("take-test-coverage", "clean;coverage;test:compile;test;coverageReport;coverageAggregate;")
+addCommandAlias("take-test-coverage", "clean;coverage;test:compile;test;coverageAggregate;")
