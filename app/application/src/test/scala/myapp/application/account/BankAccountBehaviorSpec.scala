@@ -1,21 +1,18 @@
 package myapp.application.account
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorRef
 import lerna.akka.entityreplication.typed.testkit.ReplicatedEntityBehaviorTestKit
-import org.scalatest.matchers.should.Matchers
+import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.scalatest.{ BeforeAndAfterAll, BeforeAndAfterEach }
 
-class BankAccountBehaviorSpec extends AnyWordSpecLike with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
+class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyWordSpecLike with BeforeAndAfterEach {
 
   import BankAccountBehavior._
 
-  private[this] val testKit = ActorTestKit()
-
   private[this] val bankAccountTestKit =
     ReplicatedEntityBehaviorTestKit[Command, DomainEvent, Account](
-      testKit.system,
+      system,
       BankAccountBehavior.TypeKey,
       entityId = "test-entity",
       behavior = context => BankAccountBehavior(context),
@@ -24,11 +21,6 @@ class BankAccountBehaviorSpec extends AnyWordSpecLike with Matchers with BeforeA
   override def afterEach(): Unit = {
     bankAccountTestKit.clear()
     super.afterEach()
-  }
-
-  override def afterAll(): Unit = {
-    testKit.shutdownTestKit()
-    super.afterAll()
   }
 
   "A BankAccountBehavior" should {
