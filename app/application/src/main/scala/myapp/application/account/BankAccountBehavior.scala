@@ -3,6 +3,7 @@ package myapp.application.account
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.actor.typed.{ ActorRef, Behavior }
 import lerna.akka.entityreplication.typed._
+import myapp.adapter.account.TransactionId
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
@@ -12,11 +13,13 @@ object BankAccountBehavior {
   val TypeKey: ReplicatedEntityTypeKey[Command] = ReplicatedEntityTypeKey("BankAccount")
 
   sealed trait Command
-  final case class Deposit(transactionId: Long, amount: BigDecimal, replyTo: ActorRef[DepositSucceeded]) extends Command
-  final case class Withdraw(transactionId: Long, amount: BigDecimal, replyTo: ActorRef[WithdrawReply])   extends Command
-  final case class GetBalance(replyTo: ActorRef[AccountBalance])                                         extends Command
-  final case class ReceiveTimeout()                                                                      extends Command
-  final case class Stop()                                                                                extends Command
+  final case class Deposit(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[DepositSucceeded])
+      extends Command
+  final case class Withdraw(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[WithdrawReply])
+      extends Command
+  final case class GetBalance(replyTo: ActorRef[AccountBalance]) extends Command
+  final case class ReceiveTimeout()                              extends Command
+  final case class Stop()                                        extends Command
   // DepositReply
   final case class DepositSucceeded(balance: BigDecimal)
   sealed trait WithdrawReply
@@ -26,13 +29,13 @@ object BankAccountBehavior {
   final case class AccountBalance(balance: BigDecimal)
 
   sealed trait DomainEvent
-  final case class Deposited(transactionId: Long, amount: BigDecimal) extends DomainEvent
-  final case class Withdrew(transactionId: Long, amount: BigDecimal)  extends DomainEvent
-  final case class BalanceShorted(transactionId: Long)                extends DomainEvent
+  final case class Deposited(transactionId: TransactionId, amount: BigDecimal) extends DomainEvent
+  final case class Withdrew(transactionId: TransactionId, amount: BigDecimal)  extends DomainEvent
+  final case class BalanceShorted(transactionId: TransactionId)                extends DomainEvent
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
-  final case class Account(balance: BigDecimal, resentTransactions: ListMap[Long, DomainEvent]) {
+  final case class Account(balance: BigDecimal, resentTransactions: ListMap[TransactionId, DomainEvent]) {
 
     def deposit(amount: BigDecimal): Account =
       copy(balance = balance + amount)
@@ -42,7 +45,7 @@ object BankAccountBehavior {
 
     private[this] val maxResentTransactionSize = 30
 
-    def recordEvent(transactionId: Long, event: DomainEvent): Account =
+    def recordEvent(transactionId: TransactionId, event: DomainEvent): Account =
       copy(resentTransactions = (resentTransactions + (transactionId -> event)).takeRight(maxResentTransactionSize))
 
     @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
