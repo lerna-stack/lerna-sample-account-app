@@ -4,6 +4,7 @@ import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.actor.typed.{ ActorRef, Behavior }
 import lerna.akka.entityreplication.typed._
 import myapp.adapter.account.TransactionId
+import myapp.utility.AppRequestContext
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
@@ -13,13 +14,16 @@ object BankAccountBehavior {
   val TypeKey: ReplicatedEntityTypeKey[Command] = ReplicatedEntityTypeKey("BankAccount")
 
   sealed trait Command
-  final case class Deposit(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[DepositSucceeded])
+  final case class Deposit(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[DepositSucceeded])(
+      implicit val appRequestContext: AppRequestContext,
+  ) extends Command
+  final case class Withdraw(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[WithdrawReply])(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends Command
+  final case class GetBalance(replyTo: ActorRef[AccountBalance])(implicit val appRequestContext: AppRequestContext)
       extends Command
-  final case class Withdraw(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[WithdrawReply])
-      extends Command
-  final case class GetBalance(replyTo: ActorRef[AccountBalance]) extends Command
-  final case class ReceiveTimeout()                              extends Command
-  final case class Stop()                                        extends Command
+  final case class ReceiveTimeout() extends Command
+  final case class Stop()           extends Command
   // DepositReply
   final case class DepositSucceeded(balance: BigDecimal)
   sealed trait WithdrawReply

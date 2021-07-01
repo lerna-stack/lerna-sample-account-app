@@ -5,6 +5,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.PresentationDIDesign
+import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
 import wvlet.airframe.Design
 
@@ -16,17 +17,17 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with DIS
     .bind[BankAccountApplication].toInstance(new BankAccountApplication {
       override def fetchBalance(
           accountNo: AccountNo,
-      ): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
       override def deposit(
           accountNo: AccountNo,
           transactionId: TransactionId,
           amount: Int,
-      ): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
       override def withdraw(
           accountNo: AccountNo,
           transactionId: TransactionId,
           amount: Int,
-      ): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
     })
 
   val route: ApplicationRoute = diSession.build[ApplicationRoute]

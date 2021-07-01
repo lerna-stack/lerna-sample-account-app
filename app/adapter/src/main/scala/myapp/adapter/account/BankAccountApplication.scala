@@ -1,19 +1,21 @@
 package myapp.adapter.account
 
+import myapp.utility.AppRequestContext
+
 import scala.concurrent.Future
 
 trait BankAccountApplication {
-  def fetchBalance(accountNo: AccountNo): Future[BigDecimal]
+  def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[BigDecimal]
 
   def deposit(
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  ): Future[BigDecimal]
+  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal]
 
   def withdraw(
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  ): Future[BigDecimal]
+  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal]
 }

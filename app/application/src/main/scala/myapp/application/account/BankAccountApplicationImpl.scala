@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.util.Timeout
 import lerna.akka.entityreplication.typed._
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.utility.AppRequestContext
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -19,27 +20,27 @@ class BankAccountApplicationImpl(system: ActorSystem[Nothing]) extends BankAccou
   private[this] def entityRef(accountNo: AccountNo) =
     replication.entityRefFor(BankAccountBehavior.TypeKey, accountNo.value)
 
-  override def fetchBalance(accountNo: AccountNo): Future[BigDecimal] =
+  override def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
     entityRef(accountNo)
-      .ask(BankAccountBehavior.GetBalance)
+      .ask[BankAccountBehavior.AccountBalance](BankAccountBehavior.GetBalance(_))
       .map(_.balance)
 
   override def deposit(
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  ): Future[BigDecimal] =
+  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
     entityRef(accountNo)
-      .ask(BankAccountBehavior.Deposit(transactionId, amount, _))
+      .ask[BankAccountBehavior.DepositSucceeded](BankAccountBehavior.Deposit(transactionId, amount, _))
       .map(_.balance)
 
   override def withdraw(
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  ): Future[BigDecimal] =
+  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
     entityRef(accountNo)
-      .ask(BankAccountBehavior.Withdraw(transactionId, amount, _))
+      .ask[BankAccountBehavior.WithdrawReply](BankAccountBehavior.Withdraw(transactionId, amount, _))
       .map {
         case BankAccountBehavior.WithdrawSucceeded(balance) => balance
         case BankAccountBehavior.ShortBalance()             => throw ??? // FIXME
