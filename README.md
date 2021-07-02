@@ -76,6 +76,59 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 ポート番号 `9001` は ユーザ向け機能、  
 ポート番号 `9002` は 管理用機能を定義することを想定しています。
 
+### Bank Accounts
+#### 残高確認
+- method: `GET`
+- path: `/accounts/${accountNo}`
+- headers
+    - `X-Tenant-Id`: `${tenantId}`
+        - `tenant-a`
+        - `tenant-b`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'GET' \
+    --url 'http://127.0.0.1:9001/accounts/test33' \
+    --header 'X-Tenant-Id: tenant-a' \
+```
+
+#### 入金
+- method: `GET`
+- path: `/accounts/${accountNo}/deposit`
+- (query) parameters
+    - `transactionId` (number)
+    - `amount` (number)
+- headers
+    - `X-Tenant-Id`: `${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'POST' \
+    --url "http://127.0.0.1:9001/accounts/test33/deposit?transactionId=$(date '+%s')&amount=600" \
+    --header 'X-Tenant-Id: tenant-a' \
+```
+
+#### 出金
+- method: `GET`
+- path: `/accounts/${accountNo}/withdraw`
+- (query) parameters
+    - `transactionId` (number)
+    - `amount` (number)
+- headers
+    - `X-Tenant-Id`: `${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'POST' \
+    --url "http://127.0.0.1:9001/accounts/test33/withdraw?transactionId=$(date '+%s')&amount=500" \
+    --header 'X-Tenant-Id: tenant-a' \
+```
 
 ## テストカバレッジ を取得する
 
