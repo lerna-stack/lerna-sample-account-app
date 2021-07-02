@@ -19,7 +19,7 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
   private[this] val bankAccountTestKit =
     ReplicatedEntityBehaviorTestKit[Command, DomainEvent, Account](
       system,
-      BankAccountBehavior.TypeKey,
+      BankAccountBehavior.typeKey(tenant),
       entityId = "test-entity",
       behavior = context => BankAccountBehavior(context),
     )

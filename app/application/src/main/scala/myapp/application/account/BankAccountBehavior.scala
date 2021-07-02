@@ -6,13 +6,15 @@ import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import myapp.adapter.account.TransactionId
 import myapp.utility.AppRequestContext
+import myapp.utility.tenant.AppTenant
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration._
 
 object BankAccountBehavior extends AppTypedActorLogging {
 
-  val TypeKey: ReplicatedEntityTypeKey[Command] = ReplicatedEntityTypeKey("BankAccount")
+  def typeKey(implicit tenant: AppTenant): ReplicatedEntityTypeKey[Command] =
+    ReplicatedEntityTypeKey(s"BankAccount-${tenant.id}")
 
   sealed trait Command
   final case class Deposit(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[DepositSucceeded])(implicit
