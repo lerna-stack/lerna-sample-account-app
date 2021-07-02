@@ -3,10 +3,13 @@ package myapp.presentation.application
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import lerna.http.directives.RequestLogDirective
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.util.directives.AppRequestContextDirective
 
-class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends AppRequestContextDirective {
+class ApplicationRoute(bankAccountApplication: BankAccountApplication)
+    extends AppRequestContextDirective
+    with RequestLogDirective {
   import ApplicationRoute._
 
   def route: Route = concat(
@@ -14,7 +17,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends A
       complete(StatusCodes.OK -> "OK")
     },
     extractAppRequestContext { implicit appRequestContext =>
-      pathPrefix("accounts" / Segment.map(AccountNo)) { accountNo =>
+      (logRequestDirective & logRequestResultDirective & pathPrefix("accounts" / Segment.map(AccountNo))) { accountNo =>
         concat(
           get {
             onSuccess(bankAccountApplication.fetchBalance(accountNo)) { result =>
