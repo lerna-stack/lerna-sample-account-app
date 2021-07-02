@@ -27,13 +27,14 @@ object BankAccountBehavior extends AppTypedActorLogging {
       extends Command
   final case class ReceiveTimeout() extends Command
   final case class Stop()           extends Command
+  sealed trait Reply
   // DepositReply
-  final case class DepositSucceeded(balance: BigInt)
-  sealed trait WithdrawReply
+  final case class DepositSucceeded(balance: BigInt)  extends Reply
+  sealed trait WithdrawReply                          extends Reply
   final case class ShortBalance()                     extends WithdrawReply
   final case class WithdrawSucceeded(balance: BigInt) extends WithdrawReply
   // GetBalanceReply
-  final case class AccountBalance(balance: BigInt)
+  final case class AccountBalance(balance: BigInt) extends Reply
 
   sealed trait DomainEvent
   final case class Deposited(transactionId: TransactionId, amount: BigInt) extends DomainEvent
