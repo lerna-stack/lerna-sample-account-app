@@ -1,7 +1,8 @@
 package myapp.entrypoint
 
 import akka.Done
-import akka.actor.{ ActorSystem, CoordinatedShutdown }
+import akka.actor.CoordinatedShutdown
+import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
@@ -12,11 +13,11 @@ import myapp.presentation.RootRoute
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
 class MyApp(implicit
-    val actorSystem: ActorSystem,
+    val actorSystem: ActorSystem[Nothing],
     rootRoute: RootRoute,
     config: Config,
 ) extends AppLogging {
-  import actorSystem.dispatcher
+  import actorSystem.executionContext
 
   def start(): Unit = {
     val privateInternetInterface = config.getString("myapp.private-internet.http.interface")

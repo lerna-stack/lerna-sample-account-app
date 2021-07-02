@@ -85,7 +85,7 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 sbt take-test-coverage
 ```
 
-テストカバレッジは、`./target\scala-2.12\scoverage-report`に出力されます。
+テストカバレッジは、`./target/scala-2.13/scoverage-report`に出力されます。
 
 ## データベースのスキーマを更新する
 
