@@ -3,13 +3,13 @@ package myapp.presentation.util.directives
 import akka.http.scaladsl.server.Directive1
 import lerna.http.directives.GenTraceIDDirective
 import myapp.utility.AppRequestContext
-import myapp.utility.tenant.TenantA
 
-trait AppRequestContextDirective extends GenTraceIDDirective {
+trait AppRequestContextDirective extends GenTraceIDDirective with AppTenantDirective {
   protected def extractAppRequestContext: Directive1[AppRequestContext] =
     for {
       traceId <- extractTraceId
+      tenant  <- extractTenantStrict
     } yield {
-      AppRequestContext(traceId, TenantA)
+      AppRequestContext(traceId, tenant)
     }
 }
