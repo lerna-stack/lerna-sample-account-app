@@ -20,7 +20,7 @@ class BankAccountApplicationImpl(system: ActorSystem[Nothing]) extends BankAccou
   private[this] def entityRef(accountNo: AccountNo) =
     replication.entityRefFor(BankAccountBehavior.TypeKey, accountNo.value)
 
-  override def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
+  override def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     entityRef(accountNo)
       .ask[BankAccountBehavior.AccountBalance](BankAccountBehavior.GetBalance(_))
       .map(_.balance)
@@ -29,7 +29,7 @@ class BankAccountApplicationImpl(system: ActorSystem[Nothing]) extends BankAccou
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
+  )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     entityRef(accountNo)
       .ask[BankAccountBehavior.DepositSucceeded](BankAccountBehavior.Deposit(transactionId, amount, _))
       .map(_.balance)
@@ -38,7 +38,7 @@ class BankAccountApplicationImpl(system: ActorSystem[Nothing]) extends BankAccou
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: Int,
-  )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] =
+  )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     entityRef(accountNo)
       .ask[BankAccountBehavior.WithdrawReply](BankAccountBehavior.Withdraw(transactionId, amount, _))
       .map {

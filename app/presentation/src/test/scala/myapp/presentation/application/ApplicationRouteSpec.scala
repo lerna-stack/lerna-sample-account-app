@@ -17,17 +17,17 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with DIS
     .bind[BankAccountApplication].toInstance(new BankAccountApplication {
       override def fetchBalance(
           accountNo: AccountNo,
-      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigInt] = ???
       override def deposit(
           accountNo: AccountNo,
           transactionId: TransactionId,
           amount: Int,
-      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigInt] = ???
       override def withdraw(
           accountNo: AccountNo,
           transactionId: TransactionId,
           amount: Int,
-      )(implicit appRequestContext: AppRequestContext): Future[BigDecimal] = ???
+      )(implicit appRequestContext: AppRequestContext): Future[BigInt] = ???
     })
 
   val route: ApplicationRoute = diSession.build[ApplicationRoute]

@@ -15,10 +15,10 @@ object BankAccountBehavior extends AppTypedActorLogging {
   val TypeKey: ReplicatedEntityTypeKey[Command] = ReplicatedEntityTypeKey("BankAccount")
 
   sealed trait Command
-  final case class Deposit(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[DepositSucceeded])(
-      implicit val appRequestContext: AppRequestContext,
+  final case class Deposit(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[DepositSucceeded])(implicit
+      val appRequestContext: AppRequestContext,
   ) extends Command
-  final case class Withdraw(transactionId: TransactionId, amount: BigDecimal, replyTo: ActorRef[WithdrawReply])(implicit
+  final case class Withdraw(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[WithdrawReply])(implicit
       val appRequestContext: AppRequestContext,
   ) extends Command
   final case class GetBalance(replyTo: ActorRef[AccountBalance])(implicit val appRequestContext: AppRequestContext)
@@ -26,26 +26,26 @@ object BankAccountBehavior extends AppTypedActorLogging {
   final case class ReceiveTimeout() extends Command
   final case class Stop()           extends Command
   // DepositReply
-  final case class DepositSucceeded(balance: BigDecimal)
+  final case class DepositSucceeded(balance: BigInt)
   sealed trait WithdrawReply
-  final case class ShortBalance()                         extends WithdrawReply
-  final case class WithdrawSucceeded(balance: BigDecimal) extends WithdrawReply
+  final case class ShortBalance()                     extends WithdrawReply
+  final case class WithdrawSucceeded(balance: BigInt) extends WithdrawReply
   // GetBalanceReply
-  final case class AccountBalance(balance: BigDecimal)
+  final case class AccountBalance(balance: BigInt)
 
   sealed trait DomainEvent
-  final case class Deposited(transactionId: TransactionId, amount: BigDecimal) extends DomainEvent
-  final case class Withdrew(transactionId: TransactionId, amount: BigDecimal)  extends DomainEvent
-  final case class BalanceShorted(transactionId: TransactionId)                extends DomainEvent
+  final case class Deposited(transactionId: TransactionId, amount: BigInt) extends DomainEvent
+  final case class Withdrew(transactionId: TransactionId, amount: BigInt)  extends DomainEvent
+  final case class BalanceShorted(transactionId: TransactionId)            extends DomainEvent
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
-  final case class Account(balance: BigDecimal, resentTransactions: ListMap[TransactionId, DomainEvent]) {
+  final case class Account(balance: BigInt, resentTransactions: ListMap[TransactionId, DomainEvent]) {
 
-    def deposit(amount: BigDecimal): Account =
+    def deposit(amount: BigInt): Account =
       copy(balance = balance + amount)
 
-    def withdraw(amount: BigDecimal): Account =
+    def withdraw(amount: BigInt): Account =
       copy(balance = balance - amount)
 
     private[this] val maxResentTransactionSize = 30
@@ -127,7 +127,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       context.setReceiveTimeout(1.minute, ReceiveTimeout())
       ReplicatedEntityBehavior[Command, DomainEvent, Account](
         entityContext,
-        emptyState = Account(BigDecimal(0), ListMap()),
+        emptyState = Account(BigInt(0), ListMap()),
         commandHandler = (state, cmd) => state.applyCommand(cmd, logger),
         eventHandler = (state, evt) => state.applyEvent(evt),
       ).withStopMessage(Stop())
