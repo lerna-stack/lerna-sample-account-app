@@ -2,6 +2,10 @@ package myapp.application.account
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, Behavior }
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.databind.annotation.{ JsonDeserialize, JsonSerialize }
+import com.fasterxml.jackson.databind.ser.std.StdSerializer
+import com.fasterxml.jackson.databind.{ DeserializationContext, KeyDeserializer, SerializerProvider }
 import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import myapp.adapter.account.TransactionId
@@ -43,7 +47,12 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
-  final case class Account(balance: BigInt, resentTransactions: ListMap[TransactionId, DomainEvent]) {
+  final case class Account(
+      balance: BigInt,
+      @JsonSerialize(keyUsing = classOf[Account.TransactionIdKeySerializer])
+      @JsonDeserialize(keyUsing = classOf[Account.TransactionIdKeyDeserializer])
+      resentTransactions: ListMap[TransactionId, DomainEvent],
+  ) {
 
     def deposit(amount: BigInt): Account =
       copy(balance = balance + amount)
@@ -119,6 +128,19 @@ object BankAccountBehavior extends AppTypedActorLogging {
       logger.info(
         s"${ANSI_YELLOW}[LEADER]${ANSI_RESET} ${event.toString} [balance: ${state.balance.toString}, resent-transactions: ${state.resentTransactions.size.toString}]",
       )
+    }
+  }
+
+  object Account {
+    private[BankAccountBehavior] class TransactionIdKeyDeserializer extends KeyDeserializer {
+      override def deserializeKey(key: String, ctxt: DeserializationContext): TransactionId = TransactionId(key.toLong)
+    }
+
+    private[BankAccountBehavior] class TransactionIdKeySerializer
+        extends StdSerializer[TransactionId](classOf[TransactionId]) {
+      override def serialize(transactionId: TransactionId, gen: JsonGenerator, provider: SerializerProvider): Unit = {
+        gen.writeFieldName(transactionId.value.toString)
+      }
     }
   }
 
