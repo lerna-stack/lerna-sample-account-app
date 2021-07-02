@@ -21,8 +21,6 @@ ThisBuild / javaOptions in run ++= distinctJavaOptions(
   Seq(
     // ローカル開発環境でのみ有効にしたい環境変数はここで指定する。
     "-Dmyapp.server-mode=DEV",
-    "-Dakka.persistence.cassandra.journal.keyspace-autocreate=true",
-    "-Dakka.persistence.cassandra.journal.tables-autocreate=true",
   ),
 )
 // fork先にはシステムプロパティが引き継がれないため

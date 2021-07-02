@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS}\t%-5level\t%logger\t%X{actorPath:--}\t%X{traceId:--}\t%msg%n%xEx%nopex%n</pattern>
+        </encoder>
+    </appender>
+
+<!--    <logger level="DEBUG" name="lerna.akka.entityreplication" />-->
+    <logger level="INFO" name="myapp" />
+
+    <root level="ERROR">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

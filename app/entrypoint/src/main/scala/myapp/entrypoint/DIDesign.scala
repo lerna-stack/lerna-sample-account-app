@@ -2,6 +2,7 @@ package myapp.entrypoint
 
 import akka.actor.typed.ActorSystem
 import com.typesafe.config.Config
+import myapp.application.ApplicationDIDesign
 import myapp.presentation.PresentationDIDesign
 import wvlet.airframe._
 
@@ -14,4 +15,5 @@ object DIDesign {
       .bind[MyApp].toSingleton
       .bind[Config].toSingletonProvider[ActorSystem[Nothing]] { system => system.settings.config }
       .add(PresentationDIDesign.presentationDesign)
+      .add(ApplicationDIDesign.applicationDesign)
 }
