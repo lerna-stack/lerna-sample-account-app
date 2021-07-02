@@ -21,7 +21,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends A
               complete(result.toString + "\n")
             }
           },
-          (post & parameters("amount".as[Int], "transactionId".asTransactionId)) { (amount, transactionId) =>
+          (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
             concat(
               path("deposit") {
                 onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) { result =>
@@ -42,11 +42,8 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends A
 }
 
 object ApplicationRoute {
-  implicit class NameUnmarshallerReceptacleOps(name: String) {
-    import akka.http.scaladsl.common.NameUnmarshallerReceptacle
-    import akka.http.scaladsl.unmarshalling.Unmarshaller
+  import akka.http.scaladsl.unmarshalling.Unmarshaller
 
-    def asTransactionId: NameUnmarshallerReceptacle[TransactionId] =
-      name.as[Long].as[TransactionId](Unmarshaller.strict(TransactionId.apply))
-  }
+  implicit val transactionIdFromStringUnmarshaller: Unmarshaller[String, TransactionId] =
+    implicitly[Unmarshaller[String, Long]].map(TransactionId.apply)
 }
