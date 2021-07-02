@@ -11,4 +11,8 @@ sbt \
 -Dmyapp.server-mode=DEV \
 -Dmyapp.private-internet.http.interface="127.0.0.1" \
 -Dmyapp.management.http.interface="127.0.0.1" \
+-Dakka.persistence.cassandra.journal.keyspace-autocreate=true \
+-Dakka.persistence.cassandra.journal.tables-autocreate=true \
+-Dakka.persistence.cassandra.snapshot.keyspace-autocreate=true \
+-Dakka.persistence.cassandra.snapshot.tables-autocreate=true \
 entrypoint/run
