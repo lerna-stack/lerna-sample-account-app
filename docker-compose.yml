@@ -31,6 +31,8 @@ services:
       retries: 60
 
   sbt-rpmbuild:
+    profiles:
+      - build
     build:
       context: docker/sbt-rpmbuild
       args:
