@@ -168,7 +168,7 @@ lazy val `utility` = (project in file("app/utility"))
       Janino.janino,
       Expecty.expecty,
       ScalaTest.scalaTest % Test,
-    ),
+    ) ++ Jackson.all,
   )
 
 lazy val `entrypoint` =
