@@ -2,7 +2,7 @@
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS}\t%-5level\t%logger\t%X{actorPath:--}\t%X{traceId:--}\t%msg%n%xEx%nopex%n</pattern>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS}\t%-5level\t%logger\t%X{actorPath:--}\t%X{traceId:--}\t%X{tenantId:--}\t%msg%n%xEx%nopex%n</pattern>
         </encoder>
     </appender>
 

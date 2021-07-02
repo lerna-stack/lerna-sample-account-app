@@ -9,11 +9,11 @@ import myapp.presentation.util.directives.AppRequestContextDirective
 class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends AppRequestContextDirective {
   import ApplicationRoute._
 
-  def route: Route = extractAppRequestContext { implicit appRequestContext =>
-    concat(
-      path("index") {
-        complete(StatusCodes.OK -> "OK")
-      },
+  def route: Route = concat(
+    path("index") {
+      complete(StatusCodes.OK -> "OK")
+    },
+    extractAppRequestContext { implicit appRequestContext =>
       pathPrefix("accounts" / Segment.map(AccountNo)) { accountNo =>
         concat(
           get {
@@ -36,9 +36,9 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) extends A
             )
           },
         )
-      },
-    )
-  }
+      }
+    },
+  )
 }
 
 object ApplicationRoute {

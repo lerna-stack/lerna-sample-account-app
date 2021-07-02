@@ -6,6 +6,7 @@ import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
 import myapp.adapter.account.TransactionId
 import myapp.utility.AppRequestContext
+import myapp.utility.tenant.TenantA
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -13,10 +14,12 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
 
   import BankAccountBehavior._
 
+  private[this] val tenant = TenantA
+
   private[this] val bankAccountTestKit =
     ReplicatedEntityBehaviorTestKit[Command, DomainEvent, Account](
       system,
-      BankAccountBehavior.TypeKey,
+      BankAccountBehavior.typeKey(tenant),
       entityId = "test-entity",
       behavior = context => BankAccountBehavior(context),
     )
@@ -26,7 +29,7 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
     super.afterEach()
   }
 
-  implicit private val appRequestContext: AppRequestContext = AppRequestContext(TraceId.unknown)
+  implicit private val appRequestContext: AppRequestContext = AppRequestContext(TraceId.unknown, tenant)
 
   "A BankAccountBehavior" should {
 
