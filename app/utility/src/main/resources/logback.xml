@@ -8,8 +8,9 @@
 
 <!--    <logger level="DEBUG" name="lerna.akka.entityreplication" />-->
     <logger level="INFO" name="myapp" />
+    <logger level="INFO" name="akka" />
 
-    <root level="ERROR">
+    <root level="WARN">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
