@@ -2,6 +2,7 @@ package myapp.application.account
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, Behavior }
+import com.fasterxml.jackson.annotation.{ JsonSubTypes, JsonTypeInfo }
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.annotation.{ JsonDeserialize, JsonSerialize }
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
@@ -40,6 +41,14 @@ object BankAccountBehavior extends AppTypedActorLogging {
   // GetBalanceReply
   final case class AccountBalance(balance: BigInt) extends Reply
 
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
+  @JsonSubTypes(
+    Array(
+      new JsonSubTypes.Type(name = "Deposited", value = classOf[Deposited]),
+      new JsonSubTypes.Type(name = "Withdrew", value = classOf[Withdrew]),
+      new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
+    ),
+  )
   sealed trait DomainEvent
   final case class Deposited(transactionId: TransactionId, amount: BigInt) extends DomainEvent
   final case class Withdrew(transactionId: TransactionId, amount: BigInt)  extends DomainEvent
