@@ -5,7 +5,6 @@ import lerna.util.lang.Equals._
 import myapp.utility.tenant.{ AppTenant, TenantA }
 import slick.basic.DatabaseConfig
 import slick.jdbc.{ JdbcBackend, JdbcProfile }
-import wvlet.airframe._
 
 class JDBCService(config: Config) {
 
@@ -38,15 +37,14 @@ class JDBCService(config: Config) {
       )
   }
 
-  private[this] def connectAndAddShutdownHookToAllDataBase(): Unit = {
-    dbConfigMap.values.foreach { dbConfig =>
-      // dbConfig.db は `lazy val` で定義されているためアクセスしないと DB に接続されない
-      // 起動時にチェックして、リクエスト時に初めてエラーが判明することを回避する
-      dbConfig.db.onShutdown { db =>
-        db.close()
-      }
-    }
+  def start(): Unit = {
+    // dbConfig.db は `lazy val` で定義されているためアクセスしないと DB に接続されない
+    // 起動時にチェックして、リクエスト時に初めてエラーが判明することを回避する
+    dbConfigMap.values.foreach(_.db)
   }
 
-  connectAndAddShutdownHookToAllDataBase()
+  def shutdown(): Unit = {
+    dbConfigMap.values.foreach(_.db.close())
+  }
+
 }

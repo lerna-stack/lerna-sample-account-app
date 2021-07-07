@@ -13,7 +13,7 @@ trait ReadModeDIDesign {
 
   @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
   val readModelDDesign: Design = newDesign
-    .bind[JDBCService].toSingleton
+    .bind[JDBCService].toSingleton.onStart(_.start()).onShutdown(_.shutdown())
     .bind[Tables].toSingletonProvider { jdbcService: JDBCService =>
       new Tables {
         override val profile = jdbcService.profile
