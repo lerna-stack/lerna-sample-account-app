@@ -1,4 +1,8 @@
-# Template
+# lerna-sample-account-app
+
+Lerna Stack 向けの「銀行口座」アプリケーションのサンプルです。
+
+[akka-entity-replication](https://github.com/lerna-stack/akka-entity-replication) (HA library) を用いており、より上位の可用性を実現します。
 
 ## Provisioning environment
 
