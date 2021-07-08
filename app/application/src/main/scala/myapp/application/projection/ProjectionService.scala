@@ -25,8 +25,8 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
       * Behaviors.stopped は全ノードを停止できるタイミングで削除可能。
       */
     Seq(
-      childSession.build[BankTransactionEventHandler].createBehavior(),
       Behaviors.stopped, /* 廃止: childSession.build[BankEventHandler].createBehavior() */
+      childSession.build[BankTransactionEventHandler].createBehavior(),
     )
   }
 
@@ -36,7 +36,8 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
       ShardedDaemonProcess(system).init(
         name = s"ProjectionService:${tenant.id}",
         numberOfInstances = behaviors.size,
-        behaviorFactory = i => behaviors(i),
+        // index が追加されてローリングアップデート中に例外が発生しないように、index に要素が存在しない場合は stopped を返す
+        behaviorFactory = i => behaviors.applyOrElse(i, Behaviors.stopped[ProjectionBehavior.Command]),
         stopMessage = ProjectionBehavior.Stop,
       )
     }
