@@ -3,10 +3,8 @@ package myapp.application.account
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, Behavior }
 import com.fasterxml.jackson.annotation.{ JsonSubTypes, JsonTypeInfo }
-import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.annotation.{ JsonDeserialize, JsonSerialize }
-import com.fasterxml.jackson.databind.ser.std.StdSerializer
-import com.fasterxml.jackson.databind.{ DeserializationContext, KeyDeserializer, SerializerProvider }
+import com.fasterxml.jackson.databind.util.StdConverter
 import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import myapp.adapter.account.TransactionId
@@ -58,8 +56,8 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
   final case class Account(
       balance: BigInt,
-      @JsonSerialize(keyUsing = classOf[Account.TransactionIdKeySerializer])
-      @JsonDeserialize(keyUsing = classOf[Account.TransactionIdKeyDeserializer])
+      @JsonSerialize(converter = classOf[Account.ResentTransactionsSerializerConverter])
+      @JsonDeserialize(converter = classOf[Account.ResentTransactionsDeserializerConverter])
       resentTransactions: ListMap[TransactionId, DomainEvent],
   ) {
 
@@ -141,15 +139,16 @@ object BankAccountBehavior extends AppTypedActorLogging {
   }
 
   object Account {
-    private[BankAccountBehavior] class TransactionIdKeyDeserializer extends KeyDeserializer {
-      override def deserializeKey(key: String, ctxt: DeserializationContext): TransactionId = TransactionId(key.toLong)
+    private[BankAccountBehavior] class ResentTransactionsSerializerConverter
+        extends StdConverter[ListMap[TransactionId, DomainEvent], List[(TransactionId, DomainEvent)]] {
+      override def convert(value: ListMap[TransactionId, DomainEvent]): List[(TransactionId, DomainEvent)] =
+        value.toList
     }
 
-    private[BankAccountBehavior] class TransactionIdKeySerializer
-        extends StdSerializer[TransactionId](classOf[TransactionId]) {
-      override def serialize(transactionId: TransactionId, gen: JsonGenerator, provider: SerializerProvider): Unit = {
-        gen.writeFieldName(transactionId.value.toString)
-      }
+    private[BankAccountBehavior] class ResentTransactionsDeserializerConverter
+        extends StdConverter[List[(TransactionId, DomainEvent)], ListMap[TransactionId, DomainEvent]] {
+      override def convert(value: List[(TransactionId, DomainEvent)]): ListMap[TransactionId, DomainEvent] =
+        ListMap.from(value)
     }
   }
 
