@@ -37,7 +37,8 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
         name = s"ProjectionService:${tenant.id}",
         numberOfInstances = behaviors.size,
         // index が追加されてローリングアップデート中に例外が発生しないように、index に要素が存在しない場合は stopped を返す
-        behaviorFactory = i => behaviors.applyOrElse(i, Behaviors.stopped[ProjectionBehavior.Command]),
+        behaviorFactory =
+          i => if (behaviors.isDefinedAt(i)) behaviors(i) else Behaviors.stopped[ProjectionBehavior.Command],
         stopMessage = ProjectionBehavior.Stop,
       )
     }
