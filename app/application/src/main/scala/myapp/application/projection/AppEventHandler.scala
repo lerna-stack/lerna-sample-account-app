@@ -7,9 +7,7 @@ import akka.projection.eventsourced.scaladsl.EventSourcedProvider
 import akka.projection.scaladsl.SourceProvider
 import akka.projection.slick.{ SlickHandler, SlickProjection }
 import akka.projection.{ Projection, ProjectionBehavior, ProjectionId }
-import lerna.util.trace.TraceId
 import myapp.application.persistence.AggregateEventTag
-import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
@@ -27,9 +25,6 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
   import AppEventHandler._
 
   protected def eventTag: AggregateEventTag[E]
-
-  protected implicit def requestContext(implicit traceId: TraceId, tenant: AppTenant): AppRequestContext =
-    AppRequestContext(traceId, tenant)
 
   def createBehavior(setup: BehaviorSetup): Behavior[ProjectionBehavior.Command] = {
 
