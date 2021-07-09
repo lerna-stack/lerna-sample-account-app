@@ -2,19 +2,29 @@ version: '3'
 
 services:
 
-  mariadb:
+  mariadb1: &mariadb_base
     image: mariadb:10.5.5
     restart: always
     ports:
-      - "${MARIADB_BIND_IP_PORT:-127.0.0.1:3306}:3306"
+      - "${MARIADB1_BIND_IP_PORT:-127.0.0.1:3306}:3306"
     volumes:
       - ./docker/mariadb/initdb:/docker-entrypoint-initdb.d
-    environment:
+    environment: &mariadb_environment_base
       TZ: Asia/Tokyo
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
-      MYSQL_DATABASE: "myapp"
-      MYSQL_USER: "dbuser"
-      MYSQL_PASSWORD: "dbpass"
+      MYSQL_DATABASE: "myapp-tenant-a"
+      MYSQL_USER: "dbuser_a"
+      MYSQL_PASSWORD: "dbpass@a"
+
+  mariadb2:
+    <<: *mariadb_base
+    ports:
+      - "${MARIADB2_BIND_IP_PORT:-127.0.0.2:3306}:3306"
+    environment:
+      <<: *mariadb_environment_base
+      MYSQL_DATABASE: "myapp-tenant-b"
+      MYSQL_USER: "dbuser_b"
+      MYSQL_PASSWORD: "dbpass@b"
 
   cassandra:
     build:
