@@ -9,6 +9,7 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.config.Config
 import lerna.log.AppLogging
 import lerna.util.time.JavaDurationConverters._
+import myapp.application.projection.ProjectionService
 import myapp.presentation.RootRoute
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
@@ -16,10 +17,13 @@ class MyApp(implicit
     val actorSystem: ActorSystem[Nothing],
     rootRoute: RootRoute,
     config: Config,
+    projectionService: ProjectionService,
 ) extends AppLogging {
   import actorSystem.executionContext
 
   def start(): Unit = {
+    projectionService.start()
+
     val privateInternetInterface = config.getString("myapp.private-internet.http.interface")
     val privateInternetPort      = config.getInt("myapp.private-internet.http.port")
 

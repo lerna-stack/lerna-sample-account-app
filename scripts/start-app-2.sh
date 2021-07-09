@@ -11,4 +11,5 @@ sbt \
 -Dmyapp.server-mode=DEV \
 -Dmyapp.private-internet.http.interface="127.0.0.2" \
 -Dmyapp.management.http.interface="127.0.0.2" \
+-Dakka-entity-replication.eventsourced.persistence.cassandra.events-by-tag.first-time-bucket="$(date '+%Y%m%dT%H:%M' --utc)" \
 entrypoint/run

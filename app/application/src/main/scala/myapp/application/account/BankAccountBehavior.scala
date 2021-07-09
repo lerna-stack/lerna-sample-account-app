@@ -47,10 +47,18 @@ object BankAccountBehavior extends AppTypedActorLogging {
       new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
     ),
   )
-  sealed trait DomainEvent
-  final case class Deposited(transactionId: TransactionId, amount: BigInt) extends DomainEvent
-  final case class Withdrew(transactionId: TransactionId, amount: BigInt)  extends DomainEvent
-  final case class BalanceShorted(transactionId: TransactionId)            extends DomainEvent
+  sealed trait DomainEvent {
+    def appRequestContext: AppRequestContext
+  }
+  final case class Deposited(transactionId: TransactionId, amount: BigInt)(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends DomainEvent
+  final case class Withdrew(transactionId: TransactionId, amount: BigInt)(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends DomainEvent
+  final case class BalanceShorted(transactionId: TransactionId)(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends DomainEvent
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 

@@ -11,6 +11,7 @@ sbt \
 -Dmyapp.server-mode=DEV \
 -Dmyapp.private-internet.http.interface="127.0.0.1" \
 -Dmyapp.management.http.interface="127.0.0.1" \
+-Dakka-entity-replication.eventsourced.persistence.cassandra.events-by-tag.first-time-bucket="$(date '+%Y%m%dT%H:%M' --utc)" \
 -Dakka.persistence.cassandra.journal.keyspace-autocreate=true \
 -Dakka.persistence.cassandra.journal.tables-autocreate=true \
 -Dakka.persistence.cassandra.snapshot.keyspace-autocreate=true \
