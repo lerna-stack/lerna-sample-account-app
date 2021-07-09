@@ -15,10 +15,10 @@ object Dependencies {
     val slick                    = "3.3.3"
     val expecty                  = "0.14.1"
     val janino                   = "3.0.16"
-    val kryo                     = "2.1.0"
     val h2                       = "1.4.200"
     val mariadbConnectorJ        = "2.6.2"
     val sprayJson                = "1.3.5"
+    val jackson                  = "2.12.3"
   }
 
   object Lerna {
@@ -35,17 +35,18 @@ object Dependencies {
   }
 
   object Akka {
-    val actor              = "com.typesafe.akka" %% "akka-actor-typed"            % Versions.akka
-    val stream             = "com.typesafe.akka" %% "akka-stream"                 % Versions.akka
-    val cluster            = "com.typesafe.akka" %% "akka-cluster-typed"          % Versions.akka
-    val clusterSharding    = "com.typesafe.akka" %% "akka-cluster-sharding-typed" % Versions.akka
-    val clusterTools       = "com.typesafe.akka" %% "akka-cluster-tools"          % Versions.akka
-    val persistence        = "com.typesafe.akka" %% "akka-persistence-typed"      % Versions.akka
-    val persistenceQuery   = "com.typesafe.akka" %% "akka-persistence-query"      % Versions.akka
-    val actorTestKit       = "com.typesafe.akka" %% "akka-actor-testkit-typed"    % Versions.akka
-    val streamTestKit      = "com.typesafe.akka" %% "akka-stream-testkit"         % Versions.akka
-    val multiNodeTestKit   = "com.typesafe.akka" %% "akka-multi-node-testkit"     % Versions.akka
-    val persistenceTestKit = "com.typesafe.akka" %% "akka-persistence-testkit"    % Versions.akka
+    val actor                = "com.typesafe.akka" %% "akka-actor-typed"            % Versions.akka
+    val stream               = "com.typesafe.akka" %% "akka-stream"                 % Versions.akka
+    val cluster              = "com.typesafe.akka" %% "akka-cluster-typed"          % Versions.akka
+    val clusterSharding      = "com.typesafe.akka" %% "akka-cluster-sharding-typed" % Versions.akka
+    val clusterTools         = "com.typesafe.akka" %% "akka-cluster-tools"          % Versions.akka
+    val persistence          = "com.typesafe.akka" %% "akka-persistence-typed"      % Versions.akka
+    val persistenceQuery     = "com.typesafe.akka" %% "akka-persistence-query"      % Versions.akka
+    val actorTestKit         = "com.typesafe.akka" %% "akka-actor-testkit-typed"    % Versions.akka
+    val serializationJackson = "com.typesafe.akka" %% "akka-serialization-jackson"  % Versions.akka
+    val streamTestKit        = "com.typesafe.akka" %% "akka-stream-testkit"         % Versions.akka
+    val multiNodeTestKit     = "com.typesafe.akka" %% "akka-multi-node-testkit"     % Versions.akka
+    val persistenceTestKit   = "com.typesafe.akka" %% "akka-persistence-testkit"    % Versions.akka
   }
 
   object AkkaHttp {
@@ -94,10 +95,6 @@ object Dependencies {
     val janino = "org.codehaus.janino" % "janino" % Versions.janino
   }
 
-  object Kryo {
-    val kryo = "io.altoo" %% "akka-kryo-serialization-typed" % Versions.kryo
-  }
-
   object H2 {
     val h2 = "com.h2database" % "h2" % Versions.h2
   }
@@ -108,6 +105,24 @@ object Dependencies {
 
   object WireMock {
     val wireMock = "com.github.tomakehurst" % "wiremock-jre8" % "2.27.2"
+  }
+
+  // NOTE
+  // 依存しているライブラリによって、要求するバージョンが異なる(`2.11.0` と `2.10.5`)。
+  // 1つのバージョンに固定する必要があるため、明示的に Jackson の依存を宣言する必要がある。
+  // Jackson の Minor バージョン には後方互換性があるため、メジャーバージョンが同一の最新のマイナーバージョンを指定すればよい。
+  // https://github.com/FasterXML/jackson-docs#on-jackson-versioning
+  object Jackson {
+    lazy val all =
+      Seq(core, annotations, databind, dataFormatCbor, datatypeJDK8, datatypeJSR310, moduleScala, moduleParameterNames)
+    val core                 = "com.fasterxml.jackson.core"       % "jackson-core"                   % Versions.jackson
+    val annotations          = "com.fasterxml.jackson.core"       % "jackson-annotations"            % Versions.jackson
+    val databind             = "com.fasterxml.jackson.core"       % "jackson-databind"               % Versions.jackson
+    val dataFormatCbor       = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor"        % Versions.jackson
+    val datatypeJDK8         = "com.fasterxml.jackson.datatype"   % "jackson-datatype-jdk8"          % Versions.jackson
+    val datatypeJSR310       = "com.fasterxml.jackson.datatype"   % "jackson-datatype-jsr310"        % Versions.jackson
+    val moduleScala          = "com.fasterxml.jackson.module"    %% "jackson-module-scala"           % Versions.jackson
+    val moduleParameterNames = "com.fasterxml.jackson.module"     % "jackson-module-parameter-names" % Versions.jackson
   }
 
 }
