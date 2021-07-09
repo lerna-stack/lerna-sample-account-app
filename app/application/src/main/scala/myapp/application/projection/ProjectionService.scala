@@ -5,6 +5,7 @@ import akka.actor.typed.{ ActorSystem, Behavior }
 import akka.cluster.sharding.typed.scaladsl.ShardedDaemonProcess
 import akka.projection.ProjectionBehavior
 import myapp.application.projection.transaction.BankTransactionEventHandler
+import myapp.readmodel.JDBCService
 import myapp.utility.tenant.AppTenant
 import wvlet.airframe.Session
 
@@ -15,6 +16,11 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
     import wvlet.airframe._
     val childDesign  = newDesign.bind[AppTenant].toInstance(tenant)
     val childSession = session.newChildSession(childDesign)
+    val setup = AppEventHandler.BehaviorSetup(
+      system = system,
+      dbConfig = childSession.build[JDBCService].dbConfig(tenant),
+      tenant = tenant,
+    )
 
     /** 新規の EventHandler は下記の Seq に追加する。
       * Seq の index と、EventHandler の対応は全ノードで同一である必要がある。
@@ -26,7 +32,7 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
       */
     Seq(
       Behaviors.stopped, /* 廃止: childSession.build[BankEventHandler].createBehavior() */
-      childSession.build[BankTransactionEventHandler].createBehavior(),
+      childSession.build[BankTransactionEventHandler].createBehavior(setup),
     )
   }
 

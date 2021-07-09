@@ -1,22 +1,17 @@
 package myapp.application.projection.transaction
 
 import akka.Done
-import akka.actor.typed.ActorSystem
 import akka.projection.eventsourced.EventEnvelope
 import lerna.log.AppLogging
 import lerna.util.trace.TraceId
 import myapp.application.account.BankAccountBehavior
 import myapp.application.account.BankAccountBehavior.{ BalanceShorted, Deposited, Withdrew }
 import myapp.application.projection.AppEventHandler
-import myapp.readmodel.JDBCService
 import myapp.utility.tenant.AppTenant
 import slick.dbio.DBIO
 
-class BankTransactionEventHandler(
-    val system: ActorSystem[Nothing],
-    val jdbcService: JDBCService,
-    val tenant: AppTenant,
-) extends AppEventHandler[BankAccountBehavior.DomainEvent]
+class BankTransactionEventHandler(implicit tenant: AppTenant)
+    extends AppEventHandler[BankAccountBehavior.DomainEvent]
     with AppLogging {
 
   override protected def subscribeEventTag = "bank-account-transaction"
