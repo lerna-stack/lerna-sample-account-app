@@ -8,6 +8,7 @@ import akka.projection.scaladsl.SourceProvider
 import akka.projection.slick.{ SlickHandler, SlickProjection }
 import akka.projection.{ Projection, ProjectionBehavior, ProjectionId }
 import lerna.util.trace.TraceId
+import myapp.application.persistence.AggregateEventTag
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
 import slick.basic.DatabaseConfig
@@ -25,7 +26,7 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
 
   import AppEventHandler._
 
-  protected def subscribeEventTag: String
+  protected def eventTag: AggregateEventTag[E]
 
   protected implicit def requestContext(implicit traceId: TraceId, tenant: AppTenant): AppRequestContext =
     AppRequestContext(traceId, tenant)
@@ -38,12 +39,12 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
       EventSourcedProvider.eventsByTag[E](
         setup.system,
         readJournalPluginId = s"akka-entity-replication.eventsourced.persistence.cassandra-${setup.tenant.id}.query",
-        tag = subscribeEventTag,
+        tag = eventTag.tag,
       )
 
     val projection: Projection[EventEnvelope[E]] =
       SlickProjection.exactlyOnce(
-        projectionId = ProjectionId(subscribeEventTag, setup.tenant.id),
+        projectionId = ProjectionId(eventTag.tag, setup.tenant.id),
         sourceProvider = sourceProvider,
         setup.dbConfig,
         handler = () => this,
