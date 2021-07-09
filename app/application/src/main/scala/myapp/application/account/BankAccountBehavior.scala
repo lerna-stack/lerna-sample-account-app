@@ -2,6 +2,9 @@ package myapp.application.account
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, Behavior }
+import com.fasterxml.jackson.annotation.{ JsonSubTypes, JsonTypeInfo }
+import com.fasterxml.jackson.databind.annotation.{ JsonDeserialize, JsonSerialize }
+import com.fasterxml.jackson.databind.util.StdConverter
 import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import myapp.adapter.account.TransactionId
@@ -27,14 +30,23 @@ object BankAccountBehavior extends AppTypedActorLogging {
       extends Command
   final case class ReceiveTimeout() extends Command
   final case class Stop()           extends Command
+  sealed trait Reply
   // DepositReply
-  final case class DepositSucceeded(balance: BigInt)
-  sealed trait WithdrawReply
+  final case class DepositSucceeded(balance: BigInt)  extends Reply
+  sealed trait WithdrawReply                          extends Reply
   final case class ShortBalance()                     extends WithdrawReply
   final case class WithdrawSucceeded(balance: BigInt) extends WithdrawReply
   // GetBalanceReply
-  final case class AccountBalance(balance: BigInt)
+  final case class AccountBalance(balance: BigInt) extends Reply
 
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
+  @JsonSubTypes(
+    Array(
+      new JsonSubTypes.Type(name = "Deposited", value = classOf[Deposited]),
+      new JsonSubTypes.Type(name = "Withdrew", value = classOf[Withdrew]),
+      new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
+    ),
+  )
   sealed trait DomainEvent {
     def appRequestContext: AppRequestContext
   }
@@ -50,7 +62,12 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
-  final case class Account(balance: BigInt, resentTransactions: ListMap[TransactionId, DomainEvent]) {
+  final case class Account(
+      balance: BigInt,
+      @JsonSerialize(converter = classOf[Account.ResentTransactionsSerializerConverter])
+      @JsonDeserialize(converter = classOf[Account.ResentTransactionsDeserializerConverter])
+      resentTransactions: ListMap[TransactionId, DomainEvent],
+  ) {
 
     def deposit(amount: BigInt): Account =
       copy(balance = balance + amount)
@@ -126,6 +143,20 @@ object BankAccountBehavior extends AppTypedActorLogging {
       logger.info(
         s"${ANSI_YELLOW}[LEADER]${ANSI_RESET} ${event.toString} [balance: ${state.balance.toString}, resent-transactions: ${state.resentTransactions.size.toString}]",
       )
+    }
+  }
+
+  object Account {
+    private[BankAccountBehavior] class ResentTransactionsSerializerConverter
+        extends StdConverter[ListMap[TransactionId, DomainEvent], List[(TransactionId, DomainEvent)]] {
+      override def convert(value: ListMap[TransactionId, DomainEvent]): List[(TransactionId, DomainEvent)] =
+        value.toList
+    }
+
+    private[BankAccountBehavior] class ResentTransactionsDeserializerConverter
+        extends StdConverter[List[(TransactionId, DomainEvent)], ListMap[TransactionId, DomainEvent]] {
+      override def convert(value: List[(TransactionId, DomainEvent)]): ListMap[TransactionId, DomainEvent] =
+        ListMap.from(value)
     }
   }
 
