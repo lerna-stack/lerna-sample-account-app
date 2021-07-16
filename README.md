@@ -195,3 +195,7 @@ RPM パッケージをビルドする前に、この条件が満たされてい�
 
 ## バージョン戦略
 [Calendar Versioning — CalVer](https://calver.org/) `YYYY.MM.MICRO` を使用します。
+
+## CHANGELOG
+
+特筆すべき変更点は [CHANGELOG.md](CHANGELOG.md) から確認できます。
