@@ -6,6 +6,6 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
-## Version 0.0.0
+## Version 2021.7.0
 
 - Initial release

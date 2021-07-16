@@ -192,3 +192,10 @@ RPM パッケージに含める内容はすべてコミット済みであるこ�
 RPM パッケージをビルドする前に、この条件が満たされていることを確認してください。
 
 - RPM パッケージのビルドには [CHANGELOG.md](./CHANGELOG.md) ファイルが必要です。
+
+## バージョン戦略
+[Calendar Versioning — CalVer](https://calver.org/) `YYYY.MM.MICRO` を使用します。
+
+## CHANGELOG
+
+特筆すべき変更点は [CHANGELOG.md](CHANGELOG.md) から確認できます。
