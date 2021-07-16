@@ -95,7 +95,7 @@ curl \
     --show-error \
     --request 'GET' \
     --url 'http://127.0.0.1:9001/accounts/test33' \
-    --header 'X-Tenant-Id: tenant-a' \
+    --header 'X-Tenant-Id: tenant-a'
 ```
 
 #### 入金
@@ -113,7 +113,7 @@ curl \
     --show-error \
     --request 'POST' \
     --url "http://127.0.0.1:9001/accounts/test33/deposit?transactionId=$(date '+%s')&amount=600" \
-    --header 'X-Tenant-Id: tenant-a' \
+    --header 'X-Tenant-Id: tenant-a'
 ```
 
 #### 出金
@@ -131,7 +131,7 @@ curl \
     --show-error \
     --request 'POST' \
     --url "http://127.0.0.1:9001/accounts/test33/withdraw?transactionId=$(date '+%s')&amount=500" \
-    --header 'X-Tenant-Id: tenant-a' \
+    --header 'X-Tenant-Id: tenant-a'
 ```
 
 ## テストカバレッジ を取得する
