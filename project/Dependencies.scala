@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val akkaEntityReplication    = "1.0.0+188-a673fe8d-SNAPSHOT"
+    val akkaEntityReplication    = "2.0.0"
     val lerna                    = "2.0.0-ab5c7912-SNAPSHOT"
     val akka                     = "2.6.12"
     val akkaHttp                 = "10.2.4"
