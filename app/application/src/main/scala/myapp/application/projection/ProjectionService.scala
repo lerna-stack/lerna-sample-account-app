@@ -4,6 +4,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorSystem, Behavior }
 import akka.cluster.sharding.typed.scaladsl.ShardedDaemonProcess
 import akka.projection.ProjectionBehavior
+import myapp.application.projection.deposit.DepositProjection
 import myapp.application.projection.transaction.BankTransactionEventHandler
 import myapp.readmodel.JDBCService
 import myapp.utility.tenant.AppTenant
@@ -12,7 +13,7 @@ import wvlet.airframe.Session
 class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
 
   @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
-  private def eventHandlerBehaviors(tenant: AppTenant): Seq[Behavior[ProjectionBehavior.Command]] = {
+  private def projectionBehaviors(tenant: AppTenant): Seq[Behavior[ProjectionBehavior.Command]] = {
     import wvlet.airframe._
     val childDesign  = newDesign.bind[AppTenant].toInstance(tenant)
     val childSession = session.newChildSession(childDesign)
@@ -33,12 +34,13 @@ class ProjectionService(session: Session, system: ActorSystem[Nothing]) {
     Seq(
       Behaviors.stopped, /* 廃止: childSession.build[BankEventHandler].createBehavior() */
       childSession.build[BankTransactionEventHandler].createBehavior(setup),
+      childSession.build[DepositProjection].createBehavior(setup),
     )
   }
 
   def start(): Unit = {
     AppTenant.values.foreach { tenant: AppTenant =>
-      val behaviors = eventHandlerBehaviors(tenant)
+      val behaviors = projectionBehaviors(tenant)
       ShardedDaemonProcess(system).init(
         name = s"ProjectionService:${tenant.id}",
         numberOfInstances = behaviors.size,
