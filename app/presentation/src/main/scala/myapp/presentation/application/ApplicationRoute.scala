@@ -48,5 +48,5 @@ object ApplicationRoute {
   import akka.http.scaladsl.unmarshalling.Unmarshaller
 
   implicit val transactionIdFromStringUnmarshaller: Unmarshaller[String, TransactionId] =
-    implicitly[Unmarshaller[String, Long]].map(TransactionId.apply)
+    implicitly[Unmarshaller[String, String]].map(TransactionId.apply)
 }

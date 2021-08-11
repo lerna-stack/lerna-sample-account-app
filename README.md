@@ -102,7 +102,7 @@ curl \
 - method: `GET`
 - path: `/accounts/${accountNo}/deposit`
 - (query) parameters
-    - `transactionId` (number)
+    - `transactionId` (string)
     - `amount` (number)
 - headers
     - `X-Tenant-Id`: `${tenantId}`
@@ -120,7 +120,7 @@ curl \
 - method: `GET`
 - path: `/accounts/${accountNo}/withdraw`
 - (query) parameters
-    - `transactionId` (number)
+    - `transactionId` (string)
     - `amount` (number)
 - headers
     - `X-Tenant-Id`: `${tenantId}`
