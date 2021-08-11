@@ -9,6 +9,7 @@ services:
       - "${MARIADB1_BIND_IP_PORT:-127.0.0.1:3306}:3306"
     volumes:
       - ./docker/mariadb/initdb:/docker-entrypoint-initdb.d
+      - ./docker/mariadb/bin/import-deposit-store.sh:/usr/local/bin/import-deposit-store
     environment: &mariadb_environment_base
       TZ: Asia/Tokyo
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
