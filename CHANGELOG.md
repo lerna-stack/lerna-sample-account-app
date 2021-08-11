@@ -6,6 +6,8 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
+- RDBMS のテーブルを経由して連携されるデータをインポートするサンプル実装を追加しました
+
 ## Version 2021.7.0
 
 - Initial release
