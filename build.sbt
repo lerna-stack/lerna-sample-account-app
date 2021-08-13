@@ -137,6 +137,7 @@ lazy val `application` = (project in file("app/application"))
       Akka.multiNodeTestKit   % Test,
       Akka.streamTestKit      % Test,
       Akka.persistenceTestKit % Test,
+      AkkaProjection.testKit  % Test,
     ) ++ Jackson.all,
   )
 

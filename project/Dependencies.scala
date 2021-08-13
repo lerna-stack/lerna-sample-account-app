@@ -64,6 +64,7 @@ object Dependencies {
   object AkkaProjection {
     val eventsourced = "com.lightbend.akka" %% "akka-projection-eventsourced" % Versions.akkaProjection
     val slick        = "com.lightbend.akka" %% "akka-projection-slick"        % Versions.akkaProjection
+    val testKit      = "com.lightbend.akka" %% "akka-projection-testkit"      % Versions.akkaProjection
   }
 
   object ScalaTest {
