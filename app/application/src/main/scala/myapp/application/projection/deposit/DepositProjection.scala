@@ -2,6 +2,7 @@ package myapp.application.projection.deposit
 
 import akka.Done
 import akka.actor.typed.{ ActorSystem, Behavior }
+import akka.projection.scaladsl.SourceProvider
 import akka.projection.slick.SlickProjection
 import akka.projection.{ Projection, ProjectionBehavior, ProjectionContext, ProjectionId }
 import akka.stream.scaladsl.FlowWithContext
@@ -28,8 +29,13 @@ class DepositProjection(
 )(implicit
     system: ActorSystem[Nothing],
 ) {
+  import DepositProjection._
 
-  def createProjection(setup: BehaviorSetup): Projection[Deposit] = {
+  def createProjection(
+      setup: BehaviorSetup,
+      // テストで SourceProvider を差し替えられるようにするため
+      sourceProvider: SourceProvider[Offset, Deposit] = sourceProvider,
+  ): Projection[Deposit] = {
     val projectionId = ProjectionId("DepositProjection", setup.tenant.id)
     val flow =
       FlowWithContext[Deposit, ProjectionContext]
