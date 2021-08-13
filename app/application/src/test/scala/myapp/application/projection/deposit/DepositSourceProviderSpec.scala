@@ -13,6 +13,7 @@ import org.scalatest.concurrent.ScalaFutures._
 
 import scala.concurrent.Future
 
+@SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
 class DepositSourceProviderSpec extends StandardSpec with DISessionSupport with JDBCSupport {
 
   private[this] val testkit = ActorTestKit()

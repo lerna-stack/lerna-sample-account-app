@@ -3,7 +3,6 @@ package myapp.readmodel
 import lerna.testkit.airframe.DISessionSupport
 import myapp.readmodel.schema.{ TableSeeds, Tables }
 import myapp.utility.tenant.{ AppTenant, TenantA }
-import org.scalatest.{ BeforeAndAfterAll, TestSuite }
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.concurrent.ScalaFutures.{ timeout, whenReady }
 import org.scalatest.time.{ Seconds, Span }

@@ -21,12 +21,12 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with DIS
       override def deposit(
           accountNo: AccountNo,
           transactionId: TransactionId,
-          amount: Int,
+          amount: BigInt,
       )(implicit appRequestContext: AppRequestContext): Future[BigInt] = ???
       override def withdraw(
           accountNo: AccountNo,
           transactionId: TransactionId,
-          amount: Int,
+          amount: BigInt,
       )(implicit appRequestContext: AppRequestContext): Future[BigInt] = ???
     })
 

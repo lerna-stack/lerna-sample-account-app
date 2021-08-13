@@ -31,7 +31,6 @@ object TableSeeds {
     override def apply(): scala.math.BigDecimal = BigDecimal(Random.nextInt(10))
   }
 
-  @scala.annotation.nowarn("msg=is never used")
   private implicit object TimestampValueGenerator extends ValueGenerator[java.sql.Timestamp] {
     override def apply(): java.sql.Timestamp = new java.sql.Timestamp(Random.nextInt(Int.MaxValue))
   }
