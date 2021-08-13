@@ -1,6 +1,5 @@
 package myapp.application.projection.deposit
 
-import akka.util.Timeout
 import com.typesafe.config.Config
 
 import scala.concurrent.duration.FiniteDuration
@@ -15,8 +14,6 @@ class DepositProjectionConfig(root: Config) {
   val pollingBatchSize: Int = config.getInt("polling-batch-size")
 
   val maxCommandThroughputPerSec: Int = config.getInt("max-command-throughput-per-sec")
-
-  val commandTimeout: Timeout = Timeout(config.getDuration("command-timeout").toScala)
 
   val commandParallelism: Int = config.getInt("command-parallelism")
 }
