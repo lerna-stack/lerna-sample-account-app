@@ -72,7 +72,9 @@ private[deposit] class DepositSourceProvider(
       case None =>
         DepositStore
     }
-    val action = query.take(num = config.pollingBatchSize).sortBy(_.depositId.asc).result
+    // 結果を take で絞る前に sortBy するのが重要です
+    // sortBy する前に take すると sortBy する前の結果の並びによっては取得するデータが欠損する危険性があります
+    val action = query.sortBy(_.depositId.asc).take(num = config.pollingBatchSize).result
     jdbcService.db.run(action)
   }
 }
