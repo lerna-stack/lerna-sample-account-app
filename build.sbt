@@ -42,6 +42,7 @@ lazy val root = (project in file("."))
     `adapter`,
     `application`,
     `read-model`,
+    `read-model-testkit`,
     `utility`,
     `entrypoint`,
     `testkit`,
@@ -53,7 +54,8 @@ lazy val `presentation` = (project in file("app/presentation"))
   .dependsOn(
     `adapter`,
     `read-model`,
-    `testkit` % Test,
+    `read-model-testkit` % Test,
+    `testkit`            % Test,
     `utility`,
   )
   .settings(wartremoverSettings, coverageSettings)
@@ -106,7 +108,8 @@ lazy val `application` = (project in file("app/application"))
   .dependsOn(
     `adapter`,
     `read-model`,
-    `testkit` % Test,
+    `read-model-testkit` % Test,
+    `testkit`            % Test,
     `utility`,
   )
   .settings(wartremoverSettings, coverageSettings)
@@ -204,6 +207,16 @@ lazy val `testkit` = (project in file("app/testkit"))
       Jackson.core,
       Jackson.annotations,
       Jackson.databind,
+    ),
+  )
+
+lazy val `read-model-testkit` = (project in file("app/read-model-testkit"))
+  .dependsOn(`testkit`, `read-model`)
+  .settings(wartremoverSettings, coverageSettings)
+  .settings(
+    name := "read-model-testkit",
+    libraryDependencies ++= Seq(
+      H2.h2,
     ),
   )
 
