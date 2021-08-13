@@ -10,12 +10,12 @@ trait BankAccountApplication {
   def deposit(
       accountNo: AccountNo,
       transactionId: TransactionId,
-      amount: Int,
+      amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BigInt]
 
   def withdraw(
       accountNo: AccountNo,
       transactionId: TransactionId,
-      amount: Int,
+      amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BigInt]
 }
