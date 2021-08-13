@@ -201,6 +201,7 @@ lazy val `testkit` = (project in file("app/testkit"))
       Lerna.testkit,
       Expecty.expecty,
       ScalaTest.scalaTest,
+      ScalaMock.scalaMock,
       Airframe.airframe,
       WireMock.wireMock,
       // WireMock が依存する Jackson の依存を固定する

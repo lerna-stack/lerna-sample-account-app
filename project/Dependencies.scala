@@ -19,6 +19,7 @@ object Dependencies {
     val mariadbConnectorJ        = "2.6.2"
     val sprayJson                = "1.3.5"
     val jackson                  = "2.12.3"
+    val scalaMock                = "5.1.0"
   }
 
   object Lerna {
@@ -105,6 +106,10 @@ object Dependencies {
 
   object WireMock {
     val wireMock = "com.github.tomakehurst" % "wiremock-jre8" % "2.27.2"
+  }
+
+  object ScalaMock {
+    val scalaMock = "org.scalamock" %% "scalamock" % Versions.scalaMock
   }
 
   // NOTE
