@@ -6,7 +6,7 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
-- RDBMS のテーブルを経由して連携されるデータをインポートするサンプル実装を追加しました
+- RDBMS を介して連携されるデータを Entity にインポートするサンプル実装を追加しました [PR#19](https://github.com/lerna-stack/lerna-sample-account-app/pull/19)
 
 ## Version 2021.7.0
 
