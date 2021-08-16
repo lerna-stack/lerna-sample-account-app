@@ -1,24 +1,23 @@
 package myapp.application.projection.deposit
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
 import akka.stream.testkit.scaladsl.TestSink
 import com.typesafe.config.{ Config, ConfigFactory }
 import lerna.testkit.airframe.DISessionSupport
+import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.scalatest.StandardSpec
 import myapp.utility.tenant.{ AppTenant, TenantA }
 import wvlet.airframe._
-import org.scalatest.concurrent.ScalaFutures._
 
 import scala.concurrent.Future
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
-class DepositSourceProviderSpec extends StandardSpec with DISessionSupport with JDBCSupport {
-
-  private[this] val testkit = ActorTestKit()
-
-  implicit val system: ActorSystem[Nothing] = testkit.system
+class DepositSourceProviderSpec
+    extends ScalaTestWithTypedActorTestKit
+    with StandardSpec
+    with DISessionSupport
+    with JDBCSupport {
 
   override protected val diDesign: Design = newDesign
     .add(ReadModeDIDesign.readModelDDesign)
@@ -31,13 +30,13 @@ class DepositSourceProviderSpec extends StandardSpec with DISessionSupport with 
             polling-batch-size = 3
           }
           """
-        }.withFallback(testkit.config)
+        }.withFallback(testKit.config)
     }
     .bind[AppTenant].toInstance(TenantA)
 
   import tableSeeds._
-  import tables.profile.api._
   import tables._
+  import tables.profile.api._
 
   "DepositSourceProvider" should {
 
