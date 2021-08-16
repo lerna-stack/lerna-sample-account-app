@@ -134,6 +134,50 @@ curl \
     --header 'X-Tenant-Id: tenant-a'
 ```
 
+## バッチ入金
+
+MariaDB の `deposit_store` テーブルにレコードを挿入すると、そのデータを元に口座へ入金が行われます。
+新規データは定期的にチェックされており、データを追加すると即座に入金されます。
+
+次のコマンドを実行すると、`deposit_store` テーブルに大量のダミーデータを生成できます。
+次の例で `1000` になっているデータ件数を変更すると、任意の量のデータを生成できます。
+
+```shell
+docker-compose exec mariadb1 import-deposit-store 1000
+```
+この処理は大まかに次のような流れで行われます。
+
+![](docs/img/data-import.drawio.png)
+
+- ①-②: データをどこまで取り込んだかを示す offset を取得
+- ③: offset よりも新しいデータを要求
+- ④: offset よりも新しいデータが無いか定期的にチェック（ポーリング）
+- ⑤-⑥: offset よりも新しいデータがあればそのデータを取得
+- ⑦: 取得したデータを Entity のコマンドに変換して入金を行う
+- ⑧: 入金した結果を受け取り
+- ⑨: 入金が成功したところまでの offset を保存
+- ④-⑨ を繰り返す
+
+**NOTE**
+- `DepositProjection` の実装には [Akka Projection](https://doc.akka.io/docs/akka-projection/current/overview.html) を用います
+- `akka_projection_offset_store` と `AccountEntity` へのコマンド送信には原子性（Atomicity）がありません。
+  コマンド送信だけが成功して offset の保存に失敗するということが起こる可能性があります。
+  この場合、同じコマンドが重複して再送される可能性があるため、`AccountEntity` で重複実行を防ぐ実装が必要です。
+  各入金を識別するため `TransactinId` という識別子を導入します
+- `AccountEntity` 内部で `TransactionId` を保持する方法は 2 種類考えられます
+  1. コマンドの入力元ごとに保持する
+
+      HTTP API や Projection などコマンドの入力元ごとに分けて `TransactionId` を保持します。
+      確実にコマンドの重複を回避できますが、メモリ使用量が増え、Entity の実装が複雑になるというデメリットがあります。
+
+  2. 入力元を意識せず保持する
+
+      HTTP API や Projection などコマンドの入力元を意識せず全ての `TransactionId` を同様に扱います。
+      メモリ使用量が抑えられ、Entity の実装もシンプルになりますが、重複が発生しないよう UUIDv4 など衝突のリスクが低い識別子を用いるか、
+      `TransactionId` に重複が発生しないよう発行元の調整を行う必要があります。また、`TransactionId` を持てる量には上限があるため、
+      一部のコマンドの入力元が大量の `TransactionId` を単一の Entity に送信するとコマンドの重複実行が起きるリスクが増えます。
+      このサンプルアプリケーションではこちらの方法を採用しています。
+
 ## テストカバレッジ を取得する
 
 次のコマンドを実行することで、テストカバレッジを取得できます。
