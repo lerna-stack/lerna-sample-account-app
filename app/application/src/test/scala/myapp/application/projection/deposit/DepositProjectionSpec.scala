@@ -12,7 +12,6 @@ import myapp.application.projection.AppEventHandler.BehaviorSetup
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
-import myapp.utility.tenant.AppTenant
 import org.scalamock.scalatest.MockFactory
 import wvlet.airframe._
 
@@ -28,12 +27,15 @@ class DepositProjectionSpec extends StandardSpec with MockFactory with DISession
 
   private[this] val bankAccountMock = mock[BankAccountApplication]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override protected val diDesign: Design = newDesign
     .add(ReadModeDIDesign.readModelDDesign)
     .bind[Config].toInstance(actorTestKit.config)
     .bind[ActorSystem[Nothing]].toInstance(system)
     .bind[BankAccountApplication].toInstance(bankAccountMock)
-    .bind[AppTenant].toInstance(tenant)
+    // DepositSourceProvider が要求するコンポーネントを準備しなくて良い状態にするため mock に差し替えておく
+    // SourceProvider はテストケースごとに TestSourceProvider を使う
+    .bind[DepositSourceProvider].toInstance(mock[DepositSourceProvider])
 
   "DepositProjection" should {
     import tableSeeds._
