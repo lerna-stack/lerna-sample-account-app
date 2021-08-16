@@ -67,7 +67,7 @@ class DepositSourceProviderSpec
 
       whenReady(sourceProvider.source(() => offset(1L))) { source =>
         val probe  = source.runWith(testSink)
-        val result = probe.request(3).expectNextN(2)
+        val result = probe.request(2).expectNextN(2)
         expect(result.map(_.depositId.value) === Seq(2L, 3L))
       }
     }
