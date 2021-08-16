@@ -23,7 +23,7 @@ private[deposit] object DepositProjection {
 }
 
 class DepositProjection(
-    sourceProvider: DepositSourceProvider,
+    depositSourceProvider: DepositSourceProvider,
     config: DepositProjectionConfig,
     bankAccount: BankAccountApplication,
 )(implicit
@@ -34,7 +34,7 @@ class DepositProjection(
   def createProjection(
       setup: BehaviorSetup,
       // テストで SourceProvider を差し替えられるようにするため
-      sourceProvider: SourceProvider[Offset, Deposit] = sourceProvider,
+      sourceProvider: SourceProvider[Offset, Deposit] = depositSourceProvider,
   ): Projection[Deposit] = {
     val projectionId = ProjectionId("DepositProjection", setup.tenant.id)
     val flow =
