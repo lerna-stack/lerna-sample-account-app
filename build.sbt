@@ -181,7 +181,8 @@ lazy val `entrypoint` =
       `application`,
       `read-model`,
       `utility`,
-      `testkit` % "test",
+      `testkit`            % "test",
+      `read-model-testkit` % "test",
     )
     .settings(wartremoverSettings, coverageSettings)
     .settings(
@@ -189,6 +190,8 @@ lazy val `entrypoint` =
       libraryDependencies ++= Seq(
         Airframe.airframe,
         ScalaTest.scalaTest % Test,
+        Akka.actorTestKit   % Test,
+        Lerna.testkit       % Test,
       ),
     )
 
