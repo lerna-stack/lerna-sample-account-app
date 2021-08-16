@@ -28,6 +28,7 @@ class DepositSourceProviderSpec
           """
           myapp.application.projection.deposit {
             polling-batch-size = 3
+            polling-interval   = 5millis
           }
           """
         }.withFallback(testKit.config)
@@ -100,6 +101,32 @@ class DepositSourceProviderSpec
         val probe  = source.runWith(testSink)
         val result = probe.request(4).expectNextN(4)
         expect(result.map(_.depositId.value) === Seq(1L, 2L, 3L, 4L))
+      }
+    }
+
+    "stream の実行中に追記されたデータを提供できる" in withJDBC { db =>
+      val config = diSession.build[DepositProjectionConfig]
+      expect(config.pollingBatchSize === 3)
+
+      whenReady(sourceProvider.source(() => emptyOffset)) { source =>
+        val probe = source.runWith(testSink)
+
+        db.prepare(
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 1L),
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 2L),
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 3L),
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 4L),
+        )
+
+        probe.request(4).expectNextN(4)
+
+        db.prepare(
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 5L),
+          DepositStore += tableSeeds.DepositStoreRowSeed.copy(depositId = 6L),
+        )
+
+        val result = probe.request(2).expectNextN(2)
+        expect(result.map(_.depositId.value) === Seq(5L, 6L))
       }
     }
   }
