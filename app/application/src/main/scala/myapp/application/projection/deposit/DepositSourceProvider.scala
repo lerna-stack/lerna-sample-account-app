@@ -68,6 +68,7 @@ private[deposit] class DepositSourceProvider(
   private[this] def fetchDeposits(offset: OffsetOption): Future[Seq[DepositStoreRow]] = {
     val query = offset match {
       case Some(offset) =>
+        // FYI: filter の代わりに filterOpt を使えば offset が Some の場合と None の場合の場合分けが不要になります
         DepositStore.filter(_.depositId > offset)
       case None =>
         DepositStore
