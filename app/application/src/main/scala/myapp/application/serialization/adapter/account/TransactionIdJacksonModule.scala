@@ -27,6 +27,6 @@ object TransactionIdJacksonModule {
 
   private class JsonDeserializer extends StdDeserializer[TransactionId](classOf[TransactionId]) {
     override def deserialize(p: JsonParser, context: DeserializationContext): TransactionId =
-      TransactionId(p.getNumberValue.longValue())
+      TransactionId(p.getValueAsString)
   }
 }

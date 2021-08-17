@@ -45,7 +45,7 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
   override def deposit(
       accountNo: AccountNo,
       transactionId: TransactionId,
-      amount: Int,
+      amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     AtLeastOnceComplete
       .askTo(entityRef(accountNo), BankAccountBehavior.Deposit(transactionId, amount, _), retryInterval)
@@ -54,7 +54,7 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
   override def withdraw(
       accountNo: AccountNo,
       transactionId: TransactionId,
-      amount: Int,
+      amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     AtLeastOnceComplete
       .askTo(entityRef(accountNo), BankAccountBehavior.Withdraw(transactionId, amount, _), retryInterval)

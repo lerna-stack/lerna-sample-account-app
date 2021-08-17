@@ -42,6 +42,7 @@ lazy val root = (project in file("."))
     `adapter`,
     `application`,
     `read-model`,
+    `read-model-testkit`,
     `utility`,
     `entrypoint`,
     `testkit`,
@@ -53,7 +54,8 @@ lazy val `presentation` = (project in file("app/presentation"))
   .dependsOn(
     `adapter`,
     `read-model`,
-    `testkit` % Test,
+    `read-model-testkit` % Test,
+    `testkit`            % Test,
     `utility`,
   )
   .settings(wartremoverSettings, coverageSettings)
@@ -106,7 +108,8 @@ lazy val `application` = (project in file("app/application"))
   .dependsOn(
     `adapter`,
     `read-model`,
-    `testkit` % Test,
+    `read-model-testkit` % Test,
+    `testkit`            % Test,
     `utility`,
   )
   .settings(wartremoverSettings, coverageSettings)
@@ -134,6 +137,7 @@ lazy val `application` = (project in file("app/application"))
       Akka.multiNodeTestKit   % Test,
       Akka.streamTestKit      % Test,
       Akka.persistenceTestKit % Test,
+      AkkaProjection.testKit  % Test,
     ) ++ Jackson.all,
   )
 
@@ -177,7 +181,8 @@ lazy val `entrypoint` =
       `application`,
       `read-model`,
       `utility`,
-      `testkit` % "test",
+      `testkit`            % "test",
+      `read-model-testkit` % "test",
     )
     .settings(wartremoverSettings, coverageSettings)
     .settings(
@@ -185,6 +190,8 @@ lazy val `entrypoint` =
       libraryDependencies ++= Seq(
         Airframe.airframe,
         ScalaTest.scalaTest % Test,
+        Akka.actorTestKit   % Test,
+        Lerna.testkit       % Test,
       ),
     )
 
@@ -198,12 +205,23 @@ lazy val `testkit` = (project in file("app/testkit"))
       Lerna.testkit,
       Expecty.expecty,
       ScalaTest.scalaTest,
+      ScalaMock.scalaMock,
       Airframe.airframe,
       WireMock.wireMock,
       // WireMock が依存する Jackson の依存を固定する
       Jackson.core,
       Jackson.annotations,
       Jackson.databind,
+    ),
+  )
+
+lazy val `read-model-testkit` = (project in file("app/read-model-testkit"))
+  .dependsOn(`testkit`, `read-model`)
+  .settings(wartremoverSettings, coverageSettings)
+  .settings(
+    name := "read-model-testkit",
+    libraryDependencies ++= Seq(
+      H2.h2,
     ),
   )
 
