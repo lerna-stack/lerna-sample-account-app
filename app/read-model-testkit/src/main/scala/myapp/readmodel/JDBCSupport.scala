@@ -23,6 +23,7 @@ trait JDBCSupport extends BeforeAndAfterAll {
   protected val defaultJDBCTimeout: PatienceConfiguration.Timeout = timeout(Span(30, Seconds))
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     import tables.profile.api._
     whenReady(jdbcService.db.run(tables.schema.createIfNotExists), defaultJDBCTimeout) { _ =>
       afterDatabasePrepared()
@@ -32,10 +33,12 @@ trait JDBCSupport extends BeforeAndAfterAll {
   protected def afterDatabasePrepared(): Unit = {}
 
   override def afterAll(): Unit = {
-    import tables.profile.api._
-    whenReady(jdbcService.db.run(tables.schema.dropIfExists), defaultJDBCTimeout) { _ =>
-      // do nothing
-    }
+    try {
+      import tables.profile.api._
+      whenReady(jdbcService.db.run(tables.schema.dropIfExists), defaultJDBCTimeout) { _ =>
+        // do nothing
+      }
+    } finally super.afterAll()
   }
 
   class JDBCHelper {
