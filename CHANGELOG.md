@@ -21,8 +21,13 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 - 送金機能の実装に向けて、返金機能を実装しました [PR#28](https://github.com/lerna-stack/lerna-sample-account-app/pull/28)
 
 ### Fixed
-
 - Cassandra からイベントなどを読み込む際のプロファイルが書き込みの際に使われるプロファイルとは違うものになっていた問題を修正しました [PR#21](https://github.com/lerna-stack/lerna-sample-account-app/pull/21)
+
+### Dependency Updates
+- lerna-app-library 2.0.0 から 3.0.0 に更新しました
+- wiremock-jre8 2.27.2 から 2.30.1 に更新しました  
+  バイナリ互換性を維持しやすくするため、lerna-app-library が使用する wiremock-jre8 と同じバージョンとしています。
+
 
 ## Version 2021.7.0
 
