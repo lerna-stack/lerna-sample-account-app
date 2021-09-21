@@ -25,6 +25,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
             }
           },
           (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
+            import BankAccountApplication._
             concat(
               path("deposit") {
                 onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) { result =>
@@ -32,8 +33,11 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
                 }
               },
               path("withdraw") {
-                onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) { result =>
-                  complete(result.toString + "\n")
+                onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
+                  case WithdrawalResult.Succeeded(balance) =>
+                    complete(balance.toString + "\n")
+                  case WithdrawalResult.ShortBalance =>
+                    complete(StatusCodes.BadRequest, "Short Balance\n")
                 }
               },
             )

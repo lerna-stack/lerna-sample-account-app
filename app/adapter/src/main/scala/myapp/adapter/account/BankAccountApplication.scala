@@ -1,5 +1,6 @@
 package myapp.adapter.account
 
+import myapp.adapter.account.BankAccountApplication.WithdrawalResult
 import myapp.utility.AppRequestContext
 
 import scala.concurrent.Future
@@ -39,12 +40,31 @@ trait BankAccountApplication {
     * @param accountNo 口座番号
     * @param transactionId トランザクションID
     * @param amount 出金金額
-    * @return 出金後の残高を格納した [[Future]] を返す
+    * @return 出金結果を格納した [[Future]] を返す
     */
   def withdraw(
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: BigInt,
-  )(implicit appRequestContext: AppRequestContext): Future[BigInt]
+  )(implicit appRequestContext: AppRequestContext): Future[WithdrawalResult]
+
+}
+
+object BankAccountApplication {
+
+  /** 出金結果 */
+  sealed trait WithdrawalResult
+  object WithdrawalResult {
+
+    /** 出金成功
+      * @param balance 出金後の残高
+      */
+    final case class Succeeded(balance: BigInt) extends WithdrawalResult
+
+    /** 出金失敗: 残高不足
+      */
+    case object ShortBalance extends WithdrawalResult
+
+  }
 
 }

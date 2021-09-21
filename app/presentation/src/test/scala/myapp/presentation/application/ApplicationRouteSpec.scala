@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
+import myapp.adapter.account.BankAccountApplication.WithdrawalResult
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
@@ -28,7 +29,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     accountService.fetchBalance(_)(_)
   private val deposit: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[BigInt]] =
     accountService.deposit(_, _, _)(_)
-  private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[BigInt]] =
+  private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[WithdrawalResult]] =
     accountService.withdraw(_, _, _)(_)
 
   private val invalidTenant = new AppTenant {
@@ -147,7 +148,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantA &&
           amount === BigInt(40)
-        }).returns(Future.successful(60))
+        }).returns(Future.successful(WithdrawalResult.Succeeded(60)))
 
       Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
         .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
@@ -160,12 +161,28 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantB &&
           ammount === BigInt(120)
-        }).returns(Future.successful(80))
+        }).returns(Future.successful(WithdrawalResult.Succeeded(80)))
 
       Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=120")
         .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === "80\n")
+      }
+
+    }
+
+    "not withdraw the given amount due to a short balance" in {
+
+      withdraw
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(WithdrawalResult.ShortBalance))
+
+      Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.BadRequest)
+        expect(responseAs[String] === "Short Balance\n")
       }
 
     }
