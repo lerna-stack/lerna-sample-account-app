@@ -50,7 +50,10 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
   )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
     AtLeastOnceComplete
       .askTo(entityRef(accountNo), BankAccountBehavior.Deposit(transactionId, amount, _), retryInterval)
-      .map(_.balance)
+      .map {
+        case BankAccountBehavior.DepositSucceeded(balance) => balance
+        case BankAccountBehavior.ExcessBalance()           => throw ??? // FIXME
+      }
 
   override def withdraw(
       accountNo: AccountNo,
