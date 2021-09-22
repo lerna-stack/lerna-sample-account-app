@@ -99,7 +99,7 @@ curl \
 ```
 
 #### 入金
-- method: `GET`
+- method: `POST`
 - path: `/accounts/${accountNo}/deposit`
 - (query) parameters
     - `transactionId` (string)
@@ -117,7 +117,7 @@ curl \
 ```
 
 #### 出金
-- method: `GET`
+- method: `POST`
 - path: `/accounts/${accountNo}/withdraw`
 - (query) parameters
     - `transactionId` (string)
