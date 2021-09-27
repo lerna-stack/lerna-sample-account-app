@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
-import myapp.adapter.account.BankAccountApplication.WithdrawalResult
+import myapp.adapter.account.BankAccountApplication.{ DepositResult, WithdrawalResult }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
@@ -27,7 +27,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]
   private val fetchBalance: MockFunction2[AccountNo, AppRequestContext, Future[BigInt]] =
     accountService.fetchBalance(_)(_)
-  private val deposit: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[BigInt]] =
+  private val deposit: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[DepositResult]] =
     accountService.deposit(_, _, _)(_)
   private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[WithdrawalResult]] =
     accountService.withdraw(_, _, _)(_)
@@ -99,7 +99,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantA
         }).onCall { (_, _, amount, _) =>
-          Future.successful(100 + amount)
+          Future.successful(DepositResult.Succeeded(100 + amount))
         }
 
       Post("/accounts/123-456/deposit?transactionId=deposit1&amount=200")
@@ -113,13 +113,29 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantB
         }).onCall { (_, _, amount, _) =>
-          Future.successful(200 + amount)
+          Future.successful(DepositResult.Succeeded(200 + amount))
         }
 
       Post("/accounts/123-456/deposit?transactionId=deposit1&amount=300")
         .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === "500\n")
+      }
+
+    }
+
+    "not deposit the given amount due to an excess balance" in {
+
+      deposit
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantB
+        }).returns(Future.successful(DepositResult.ExcessBalance))
+
+      Post("/accounts/123-456/deposit?transactionId=deposit1&amount=100")
+        .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
+        expect(status === StatusCodes.BadRequest)
+        expect(responseAs[String] === "Excess Balance\n")
       }
 
     }

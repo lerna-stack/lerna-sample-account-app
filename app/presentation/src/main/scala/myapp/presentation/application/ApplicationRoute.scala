@@ -28,8 +28,11 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
             import BankAccountApplication._
             concat(
               path("deposit") {
-                onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) { result =>
-                  complete(result.toString + "\n")
+                onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) {
+                  case DepositResult.Succeeded(balance) =>
+                    complete(balance.toString + "\n")
+                  case DepositResult.ExcessBalance =>
+                    complete(StatusCodes.BadRequest, "Excess Balance\n")
                 }
               },
               path("withdraw") {

@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.util.Timeout
 import lerna.akka.entityreplication.typed._
 import lerna.akka.entityreplication.util.AtLeastOnceComplete
-import myapp.adapter.account.BankAccountApplication.WithdrawalResult
+import myapp.adapter.account.BankAccountApplication.{ DepositResult, WithdrawalResult }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
@@ -47,12 +47,12 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: BigInt,
-  )(implicit appRequestContext: AppRequestContext): Future[BigInt] =
+  )(implicit appRequestContext: AppRequestContext): Future[DepositResult] =
     AtLeastOnceComplete
       .askTo(entityRef(accountNo), BankAccountBehavior.Deposit(transactionId, amount, _), retryInterval)
       .map {
-        case BankAccountBehavior.DepositSucceeded(balance) => balance
-        case BankAccountBehavior.ExcessBalance()           => throw ??? // FIXME
+        case BankAccountBehavior.DepositSucceeded(balance) => DepositResult.Succeeded(balance)
+        case BankAccountBehavior.ExcessBalance()           => DepositResult.ExcessBalance
       }
 
   override def withdraw(
