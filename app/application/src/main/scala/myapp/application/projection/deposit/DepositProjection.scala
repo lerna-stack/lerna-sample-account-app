@@ -14,7 +14,7 @@ import myapp.application.projection.AppEventHandler.BehaviorSetup
 import myapp.utility.AppRequestContext
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
 private[deposit] object DepositProjection {
@@ -23,6 +23,15 @@ private[deposit] object DepositProjection {
     * 選択できる型は次のページを参照: https://doc.akka.io/docs/akka-projection/1.2.1/slick.html#offset-types
     */
   type Offset = Long
+
+  /** [[BankAccountApplication]] が利用不可である
+    *
+    * この例外は [[DepositProjection]] で [[BankAccountApplication]] が利用できない場合に発生する。
+    * 具体的には、[[BankAccountApplication.deposit]] が [[BankAccountApplication.DepositResult.Timeout]] を返した場合がある。
+    * この例外に遭遇しても retry や restart することで回復が期待できる。
+    */
+  final class BankAccountApplicationUnavailable(message: String) extends Exception(message)
+
 }
 
 /** [[DepositSourceProvider]] から入金要求を購読し、[[BankAccountApplication]] に入金を行う
@@ -39,11 +48,20 @@ class DepositProjection(
 ) extends AppLogging {
   import DepositProjection._
 
+  /** 入金要求 [[Deposit]] を処理する [[Projection]] を作成する
+    *
+    * ハンドラでエラーが発生した場合には、設定 `akka.projection.recovery-strategy` や
+    * `akka.projection.restart-backoff` で構成した方法で retry や restart が行われる。
+    *
+    * @see https://doc.akka.io/docs/akka-projection/1.1.0/error.html#projection-restart
+    * @see https://doc.akka.io/docs/akka-projection/current/error.html#projection-restart
+    */
   def createProjection(
       setup: BehaviorSetup,
       // テストで SourceProvider を差し替えられるようにするため
       sourceProvider: SourceProvider[Offset, Deposit] = depositSourceProvider,
   ): Projection[Deposit] = {
+    val FutureDone   = Future.successful(Done)
     val projectionId = ProjectionId("DepositProjection", setup.tenant.id)
     val flow =
       FlowWithContext[Deposit, ProjectionContext]
@@ -59,13 +77,19 @@ class DepositProjection(
           val transactionId = TransactionId(s"${projectionId.id}:${request.depositId.value.toString}")
           bankAccount
             .deposit(accountNo, transactionId, request.amount)
-            .map {
+            .flatMap {
               case DepositResult.Succeeded(balance) =>
                 logger.info("Deposit succeeded: request={}", request)
-                Done
+                FutureDone
               case DepositResult.ExcessBalance =>
                 logger.error("Deposit failed due to an excess balance: request={}", request)
-                Done
+                FutureDone
+              case DepositResult.Timeout =>
+                val cause = new BankAccountApplicationUnavailable(
+                  s"Deposit failed due to the service being unavailable: request=${request.toString}",
+                )
+                logger.warn(cause.getMessage)
+                Future.failed(cause)
             }
         }
 

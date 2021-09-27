@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import lerna.http.directives.RequestLogDirective
+import myapp.adapter.account.BankAccountApplication.FetchBalanceResult
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.util.directives.AppRequestContextDirective
 
@@ -20,8 +21,11 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
       (logRequestDirective & logRequestResultDirective & pathPrefix("accounts" / Segment.map(AccountNo))) { accountNo =>
         concat(
           get {
-            onSuccess(bankAccountApplication.fetchBalance(accountNo)) { result =>
-              complete(result.toString + "\n")
+            onSuccess(bankAccountApplication.fetchBalance(accountNo)) {
+              case FetchBalanceResult.Succeeded(balance) =>
+                complete(balance.toString + "\n")
+              case FetchBalanceResult.Timeout =>
+                complete(StatusCodes.ServiceUnavailable)
             }
           },
           (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
@@ -33,6 +37,8 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
                     complete(balance.toString + "\n")
                   case DepositResult.ExcessBalance =>
                     complete(StatusCodes.BadRequest, "Excess Balance\n")
+                  case DepositResult.Timeout =>
+                    complete(StatusCodes.ServiceUnavailable)
                 }
               },
               path("withdraw") {
@@ -41,6 +47,8 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
                     complete(balance.toString + "\n")
                   case WithdrawalResult.ShortBalance =>
                     complete(StatusCodes.BadRequest, "Short Balance\n")
+                  case WithdrawalResult.Timeout =>
+                    complete(StatusCodes.ServiceUnavailable)
                 }
               },
             )

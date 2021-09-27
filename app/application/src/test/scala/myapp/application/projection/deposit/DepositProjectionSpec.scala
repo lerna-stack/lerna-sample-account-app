@@ -11,6 +11,7 @@ import lerna.testkit.airframe.DISessionSupport
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.application.projection.AppEventHandler.BehaviorSetup
+import myapp.application.projection.deposit.DepositProjection.BankAccountApplicationUnavailable
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -20,7 +21,7 @@ import wvlet.airframe._
 import java.time.Instant
 import scala.concurrent.Future
 
-@SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
+@SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride", "org.wartremover.warts.IsInstanceOf"))
 class DepositProjectionSpec
     extends ScalaTestWithTypedActorTestKit
     with StandardSpec
@@ -126,6 +127,25 @@ class DepositProjectionSpec
         }
       }
 
+    }
+
+    "BankAccountApplication.deposit で Timeout となった場合に WARN ログが出力される" in withJDBC { db =>
+      val projection = createProjection(
+        Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
+      )
+
+      (bankAccountMock
+        .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+        .expects(AccountNo("ac-1"), TransactionId("DepositProjection-tenant-a:0"), BigInt(10), *)
+        .returning(Future.successful(BankAccountApplication.DepositResult.Timeout))
+
+      LoggingTestKit.warn("Deposit failed due to the service being unavailable").expect {
+        projectionTestKit.runWithTestSink(projection) { probe =>
+          probe.request(1)
+          val error = probe.expectError()
+          expect(error.isInstanceOf[BankAccountApplicationUnavailable])
+        }
+      }
     }
 
   }

@@ -1,6 +1,6 @@
 package myapp.adapter.account
 
-import myapp.adapter.account.BankAccountApplication.{ DepositResult, WithdrawalResult }
+import myapp.adapter.account.BankAccountApplication.{ DepositResult, FetchBalanceResult, WithdrawalResult }
 import myapp.utility.AppRequestContext
 
 import scala.concurrent.Future
@@ -12,9 +12,9 @@ trait BankAccountApplication {
     * 口座は、口座番号([[AccountNo]])とテナント([[myapp.utility.tenant.AppTenant]])で一意に決定される。
     *
     * @param accountNo 口座番号
-    * @return 残高を格納した [[Future]] を返す
+    * @return 残高照会結果を格納した [[Future]] を返す
     */
-  def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[BigInt]
+  def fetchBalance(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Future[FetchBalanceResult]
 
   /** 指定口座に指定金額を入金する。
     *
@@ -52,6 +52,22 @@ trait BankAccountApplication {
 
 object BankAccountApplication {
 
+  /** 残高照会結果 */
+  sealed trait FetchBalanceResult extends Product with Serializable
+  object FetchBalanceResult {
+
+    /** 残高照会成功
+      * @param balance 残高
+      */
+    final case class Succeeded(balance: BigInt) extends FetchBalanceResult
+
+    /** 残高照会失敗: タイムアウト
+      * 決められた時間内に残高照会できなかった場合に発生する。
+      */
+    case object Timeout extends FetchBalanceResult
+
+  }
+
   /** 入金結果 */
   sealed trait DepositResult extends Product with Serializable
   object DepositResult {
@@ -63,6 +79,15 @@ object BankAccountApplication {
 
     /** 入金失敗: 残高不足 */
     case object ExcessBalance extends DepositResult
+
+    /** 入金失敗: タイムアウト
+      *
+      * 決められた時間内に入金処理が完了しなかった場合に発生する。
+      *
+      * タイムアウトが発生した場合、入金が処理されたかどうか(成功したか、失敗したか)を知ることができない。
+      * 同じ [[TransactionId]] を用いてリトライする方が良い。
+      */
+    case object Timeout extends DepositResult
 
   }
 
@@ -78,6 +103,15 @@ object BankAccountApplication {
     /** 出金失敗: 残高不足
       */
     case object ShortBalance extends WithdrawalResult
+
+    /** 出金失敗: タイムアウト
+      *
+      * 決められた時間内に出金処理が完了しなかった場合に発生する。
+      *
+      * タイムアウトが発生した場合、出金が処理されたかどうか(成功したか、失敗したか)を知ることができない。
+      * 同じ [[TransactionId]] を用いてリトライする方が良い。
+      */
+    case object Timeout extends WithdrawalResult
 
   }
 
