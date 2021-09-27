@@ -2,6 +2,7 @@ package myapp.application.projection.deposit
 
 import akka.actor.testkit.typed.scaladsl.LoggingTestKit
 import akka.actor.typed.ActorSystem
+import akka.projection.Projection
 import akka.projection.scaladsl.SourceProvider
 import akka.projection.testkit.scaladsl.{ ProjectionTestKit, TestSourceProvider }
 import akka.stream.scaladsl.Source
@@ -47,18 +48,22 @@ class DepositProjectionSpec
     val projectionTestKit = ProjectionTestKit(system)
     val setup             = BehaviorSetup(system, jdbcService.dbConfig, tenant)
 
-    "Source のデータを元に BankAccountApplication.deposit が呼び出される" in withJDBC { db =>
-      val source = Source(
-        Seq(
-          Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
-          Deposit(DepositId(1L), accountNo = "ac-2", amount = BigInt(20), createdAt = Instant.now()),
-        ),
-      )
-
+    /** [[Projection]] を作成する
+      *
+      * Projection の Source Provider は与えられた入金要求から作成される。
+      */
+    def createProjection(requests: Deposit*): Projection[Deposit] = {
+      val source = Source(requests)
       val sourceProvider: SourceProvider[DepositProjection.Offset, Deposit] =
         TestSourceProvider[DepositProjection.Offset, Deposit](source, e => e.depositId.value)
+      diSession.build[DepositProjection].createProjection(setup, sourceProvider)
+    }
 
-      val projection = diSession.build[DepositProjection].createProjection(setup, sourceProvider)
+    "Source のデータを元に BankAccountApplication.deposit が呼び出される" in withJDBC { db =>
+      val projection = createProjection(
+        Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
+        Deposit(DepositId(1L), accountNo = "ac-2", amount = BigInt(20), createdAt = Instant.now()),
+      )
 
       (bankAccountMock
         .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
@@ -79,17 +84,10 @@ class DepositProjectionSpec
     }
 
     "BankAccountApplication.deposit で ExcessBalance となった入金は破棄されて、後続の入金処理が継続する" in withJDBC { db =>
-      val source = Source(
-        Seq(
-          Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
-          Deposit(DepositId(1L), accountNo = "ac-2", amount = BigInt(20), createdAt = Instant.now()),
-        ),
+      val projection = createProjection(
+        Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
+        Deposit(DepositId(1L), accountNo = "ac-2", amount = BigInt(20), createdAt = Instant.now()),
       )
-
-      val sourceProvider: SourceProvider[DepositProjection.Offset, Deposit] =
-        TestSourceProvider[DepositProjection.Offset, Deposit](source, e => e.depositId.value)
-
-      val projection = diSession.build[DepositProjection].createProjection(setup, sourceProvider)
 
       (bankAccountMock
         .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
@@ -110,16 +108,9 @@ class DepositProjectionSpec
     }
 
     "BankAccountApplication.deposit で ExcessBalance となった場合にエラーログが出力される" in withJDBC { db =>
-      val source = Source(
-        Seq(
-          Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
-        ),
+      val projection = createProjection(
+        Deposit(DepositId(0L), accountNo = "ac-1", amount = BigInt(10), createdAt = Instant.now()),
       )
-
-      val sourceProvider: SourceProvider[DepositProjection.Offset, Deposit] =
-        TestSourceProvider[DepositProjection.Offset, Deposit](source, e => e.depositId.value)
-
-      val projection = diSession.build[DepositProjection].createProjection(setup, sourceProvider)
 
       (bankAccountMock
         .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
