@@ -53,7 +53,7 @@ trait BankAccountApplication {
 object BankAccountApplication {
 
   /** 入金結果 */
-  sealed trait DepositResult
+  sealed trait DepositResult extends Product with Serializable
   object DepositResult {
 
     /** 入金成功
@@ -67,7 +67,7 @@ object BankAccountApplication {
   }
 
   /** 出金結果 */
-  sealed trait WithdrawalResult
+  sealed trait WithdrawalResult extends Product with Serializable
   object WithdrawalResult {
 
     /** 出金成功
