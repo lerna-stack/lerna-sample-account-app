@@ -128,6 +128,24 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       result2.replyOfType[ShortBalance]
     }
 
+    "reject the second Withdraw request with the same transactionId if the first Withdraw request fails due to a short balance" in {
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      def withdraw[T](replyTo: ActorRef[WithdrawReply]) =
+        Withdraw(TransactionId("2"), amount = 2000, replyTo)
+
+      val firstWithdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](withdraw)
+      firstWithdrawalResult.replyOfType[ShortBalance]
+
+      val secondWithdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](withdraw)
+      secondWithdrawalResult.hasNoEvents should be(true)
+      secondWithdrawalResult.replyOfType[ShortBalance]
+    }
+
     "not handle a Withdraw request with a transactionId that is associated with another command type" in {
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
