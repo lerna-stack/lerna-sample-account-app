@@ -63,6 +63,23 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       resultOfExcessBalance.replyOfType[ExcessBalance]
     }
 
+    "not handle a Deposit request with a transactionId that is associated with another command type" in {
+      val initialDepositId = TransactionId("1")
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(initialDepositId, amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val initialWithdrawalId = TransactionId("2")
+      val initialWithdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(initialWithdrawalId, amount = 300, _))
+      initialWithdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val invalidDepositId = initialWithdrawalId // Assign already used transactionId for withdrawal
+      val depositResultWithInvalidId =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(invalidDepositId, amount = 400, _))
+      depositResultWithInvalidId.hasNoEvents should be(true)
+    }
+
     "decrease a balance when it receives Withdraw" in {
       val transactionId1 = TransactionId("1")
       val result1        = bankAccountTestKit.runCommand[DepositReply](Deposit(transactionId1, amount = 3000, _))
@@ -89,6 +106,23 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       val transactionId2 = TransactionId("2")
       val result2        = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(transactionId2, amount = 5000, _))
       result2.replyOfType[ShortBalance]
+    }
+
+    "not handle a Withdraw request with a transactionId that is associated with another command type" in {
+      val initialDepositId = TransactionId("1")
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(initialDepositId, amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val initialWithdrawalId = TransactionId("2")
+      val initialWithdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(initialWithdrawalId, amount = 300, _))
+      initialWithdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val invalidWithdrawalId = initialDepositId // Assign already used transactionId for deposit
+      val withdrawalResultWithInvalidId =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(invalidWithdrawalId, amount = 400, _))
+      withdrawalResultWithInvalidId.hasNoEvents should be(true)
     }
 
     "return a current balance when it receives GetBalance" in {
