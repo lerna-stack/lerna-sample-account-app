@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 object BankAccountBehavior extends AppTypedActorLogging {
 
   /** 残高の上限値 */
-  val BalanceMaxLimit: BigInt = 10_000
+  val BalanceMaxLimit: BigInt = 10_000_000
 
   def typeKey(implicit tenant: AppTenant): ReplicatedEntityTypeKey[Command] =
     ReplicatedEntityTypeKey(s"BankAccount-${tenant.id}")
