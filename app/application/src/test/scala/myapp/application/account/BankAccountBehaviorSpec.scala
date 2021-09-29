@@ -63,6 +63,26 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       resultOfExcessBalance.replyOfType[ExcessBalance]
     }
 
+    "reject the second Deposit request with the same transactionId if the first Deposit request fails due to an excess balance" in {
+      val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
+
+      val depositingMaxAmountResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = balanceMaxLimit, _))
+      depositingMaxAmountResult.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
+
+      def deposit[T](replyTo: ActorRef[DepositReply]) =
+        Deposit(TransactionId("2"), amount = 1, replyTo)
+
+      val firstExcessBalanceResult =
+        bankAccountTestKit.runCommand[DepositReply](deposit)
+      firstExcessBalanceResult.replyOfType[ExcessBalance]
+
+      val secondExcessBalanceResult =
+        bankAccountTestKit.runCommand[DepositReply](deposit)
+      secondExcessBalanceResult.hasNoEvents should be(true)
+      secondExcessBalanceResult.replyOfType[ExcessBalance]
+    }
+
     "not handle a Deposit request with a transactionId that is associated with another command type" in {
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
