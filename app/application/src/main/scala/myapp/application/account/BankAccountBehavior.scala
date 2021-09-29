@@ -55,18 +55,22 @@ object BankAccountBehavior extends AppTypedActorLogging {
   sealed trait DomainEvent {
     def appRequestContext: AppRequestContext
   }
+
+  sealed trait DepositDomainEvent extends DomainEvent
   final case class Deposited(transactionId: TransactionId, amount: BigInt)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends DepositDomainEvent
   final case class BalanceExceeded(transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends DepositDomainEvent
+
+  sealed trait WithdrawalDomainEvent extends DomainEvent
   final case class Withdrew(transactionId: TransactionId, amount: BigInt)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawalDomainEvent
   final case class BalanceShorted(transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawalDomainEvent
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
@@ -99,7 +103,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               Effect.reply(replyTo)(DepositSucceeded(balance))
             case Some(_: BalanceExceeded) =>
               Effect.reply(replyTo)(ExcessBalance())
-            case Some(_) =>
+            case Some(_: WithdrawalDomainEvent) =>
               Effect.unhandled.thenNoReply()
             // Receive an unknown transaction
             case None =>
@@ -125,7 +129,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               Effect.reply(replyTo)(WithdrawSucceeded(balance))
             case Some(_: BalanceShorted) =>
               Effect.reply(replyTo)(ShortBalance())
-            case Some(_) =>
+            case Some(_: DepositDomainEvent) =>
               Effect.unhandled.thenNoReply()
             // Receive an unknown transaction
             case None =>
