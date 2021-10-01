@@ -50,6 +50,22 @@ sbt clean test:compile test
 ./scripts/start-app-2.sh
 ```
 
+
+## 口座の仕様
+
+口座には残高があります。  
+口座はテナントと口座番号によって一意に識別できます。
+
+口座に対して次の操作を実行できます。
+* [残高確認](#残高確認)
+* [入金](#入金)
+  * 口座の残高には上限が設定されています。  
+    残高上限は 10,000,000 です。  
+    上限を超えるような入金を行うことはできません。
+* [出金](#出金)
+  * 口座の残高が0未満になるような出金を行うことはできません。
+
+
 ## API
 
 アプリサーバ1(`127.0.0.1`)にリクエストを送る例です。
@@ -82,12 +98,17 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 
 ### Bank Accounts
 #### 残高確認
+残高を確認できます。
+
+残高を取得できた場合は、HTTPステータスコード 200 OK と 口座残高 を返します。
+残高取得でタイムアウトが発生した場合には、HTTPステータスコード 503 ServiceUnavailable を返します。
+
 - method: `GET`
 - path: `/accounts/${accountNo}`
 - headers
-    - `X-Tenant-Id`: `${tenantId}`
-        - `tenant-a`
-        - `tenant-b`
+    - テナント: `X-Tenant-Id`: `${tenantId}`
+      - `tenant-a`
+      - `tenant-b`
 
 ```shell
 curl \
@@ -98,14 +119,27 @@ curl \
     --header 'X-Tenant-Id: tenant-a'
 ```
 
+
 #### 入金
+口座に指定金額を入金できます。
+
+入金に成功すると、HTTPステータスコード 200 OK と 入金後の口座残高 を返します。
+残高超過となるような場合には、HTTPステータスコード 400 BadRequest を返します。
+入金処理でタイムアウトが発生した場合には、HTTPステータスコード 503 ServiceUnavailable を返します。
+
+入金でタイムアウトが発生した場合には、同じ 入金ID を指定してリトライすることができます。
+入金ID により冪等性が保証されています。
+同じ 入金ID を指定して リトライする場合、前回とまったく同じ入金金額を指定してください。
+異なる入金金額を指定して成功が返った場合、実際にいくら入金できたのかをこのAPIからは知ることはできません。
+今後の更新によって、このような場合に失敗を返すように変更される可能性があります。
+
 - method: `POST`
 - path: `/accounts/${accountNo}/deposit`
 - (query) parameters
-    - `transactionId` (string)
-    - `amount` (number)
+    - 入金ID: `transactionId` (string)
+    - 入金金額: `amount` (number)
 - headers
-    - `X-Tenant-Id`: `${tenantId}`
+    - テナント: `X-Tenant-Id`: `${tenantId}`
 
 ```shell
 curl \
@@ -117,13 +151,25 @@ curl \
 ```
 
 #### 出金
+口座から指定金額を出金できます。
+
+出金に成功すると、HTTPステータスコード 200 OK と 出金後の口座残高 を返します。
+残高不足となるような場合には、HTTPステータスコード 400 BadRequest を返します。
+出金処理でタイムアウトが発生した場合には、HTTPステータスコード 503 ServiceUnavailable を返します。
+
+出金でタイムアウトが発生した場合には、同じ 出金ID を指定してリトライすることができます。
+出金ID により冪等性が保証されています。
+同じ 出金ID を指定して リトライする場合、前回とまったく同じ出金金額を指定してください。
+異なる出金金額を指定して成功が返った場合、実際にいくら出金できたのかをこのAPIからは知ることはできません。
+今後の更新によって、このような場合に失敗を返すように変更される可能性があります。
+
 - method: `POST`
 - path: `/accounts/${accountNo}/withdraw`
 - (query) parameters
-    - `transactionId` (string)
-    - `amount` (number)
+    - 出金ID: `transactionId` (string)
+    - 出金金額: `amount` (number)
 - headers
-    - `X-Tenant-Id`: `${tenantId}`
+    - テナント: `X-Tenant-Id`: `${tenantId}`
 
 ```shell
 curl \
@@ -157,6 +203,10 @@ docker-compose exec mariadb1 import-deposit-store 1000
 - ⑧: 入金した結果を受け取り
 - ⑨: 入金が成功したところまでの offset を保存
 - ④-⑨ を繰り返す
+
+**バッチ入金でのエラーの扱い方**
+* バッチ入金で残高超過が発生した場合、ERROR ログを出力して当該入金はスキップします
+* バッチ入金でタイムアウトが発生した場合、WARN ログを出力してバッチ入金処理を再起動します
 
 **NOTE**
 - `DepositProjection` の実装には [Akka Projection](https://doc.akka.io/docs/akka-projection/current/overview.html) を用います
