@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
+import myapp.adapter.account.BankAccountApplication.{ DepositResult, FetchBalanceResult, WithdrawalResult }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
@@ -24,11 +25,11 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
 
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]
-  private val fetchBalance: MockFunction2[AccountNo, AppRequestContext, Future[BigInt]] =
+  private val fetchBalance: MockFunction2[AccountNo, AppRequestContext, Future[FetchBalanceResult]] =
     accountService.fetchBalance(_)(_)
-  private val deposit: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[BigInt]] =
+  private val deposit: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[DepositResult]] =
     accountService.deposit(_, _, _)(_)
-  private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[BigInt]] =
+  private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[WithdrawalResult]] =
     accountService.withdraw(_, _, _)(_)
 
   private val invalidTenant = new AppTenant {
@@ -55,13 +56,13 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         .expects(where { (accountNo, context) =>
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantA
-        }).returns(Future.successful(100))
+        }).returns(Future.successful(FetchBalanceResult.Succeeded(100)))
 
       fetchBalance
         .expects(where { (accountNo, context) =>
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantB
-        }).returns(Future.successful(200))
+        }).returns(Future.successful(FetchBalanceResult.Succeeded(200)))
 
       Get("/accounts/123-456").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
@@ -91,6 +92,21 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return ServiceUnavailable if the account replies with a timeout against the fetch balance request" in {
+
+      fetchBalance
+        .expects(where { (accountNo, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        })
+        .returns(Future.successful(FetchBalanceResult.Timeout))
+
+      Get("/accounts/123-456").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+      }
+
+    }
+
     "deposit the given amount into the account and then return the account balance" in {
 
       deposit
@@ -98,7 +114,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantA
         }).onCall { (_, _, amount, _) =>
-          Future.successful(100 + amount)
+          Future.successful(DepositResult.Succeeded(100 + amount))
         }
 
       Post("/accounts/123-456/deposit?transactionId=deposit1&amount=200")
@@ -112,13 +128,29 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantB
         }).onCall { (_, _, amount, _) =>
-          Future.successful(200 + amount)
+          Future.successful(DepositResult.Succeeded(200 + amount))
         }
 
       Post("/accounts/123-456/deposit?transactionId=deposit1&amount=300")
         .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === "500\n")
+      }
+
+    }
+
+    "not deposit the given amount due to an excess balance" in {
+
+      deposit
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantB
+        }).returns(Future.successful(DepositResult.ExcessBalance))
+
+      Post("/accounts/123-456/deposit?transactionId=deposit1&amount=100")
+        .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
+        expect(status === StatusCodes.BadRequest)
+        expect(responseAs[String] === "Excess Balance\n")
       }
 
     }
@@ -140,6 +172,21 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return ServiceUnavailable if the account replies with a timeout against the deposit request" in {
+
+      deposit
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(DepositResult.Timeout))
+
+      Post("/accounts/123-456/deposit?transactionId=deposit1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+      }
+
+    }
+
     "withdraw the given amount from the account and then return the account balance" in {
 
       withdraw
@@ -147,7 +194,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantA &&
           amount === BigInt(40)
-        }).returns(Future.successful(60))
+        }).returns(Future.successful(WithdrawalResult.Succeeded(60)))
 
       Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
         .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
@@ -160,12 +207,28 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           accountNo === AccountNo("123-456") &&
           context.tenant === TenantB &&
           ammount === BigInt(120)
-        }).returns(Future.successful(80))
+        }).returns(Future.successful(WithdrawalResult.Succeeded(80)))
 
       Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=120")
         .withHeaders(tenantHeader(TenantB)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === "80\n")
+      }
+
+    }
+
+    "not withdraw the given amount due to a short balance" in {
+
+      withdraw
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(WithdrawalResult.ShortBalance))
+
+      Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.BadRequest)
+        expect(responseAs[String] === "Short Balance\n")
       }
 
     }
@@ -185,6 +248,20 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         expect(rejection.isInstanceOf[MissingHeaderRejection])
       }
 
+    }
+
+    "return ServiceUnavailable if the account replies with a timeout against the withdrawal request" in {
+
+      withdraw
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(WithdrawalResult.Timeout))
+
+      Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+      }
     }
 
   }

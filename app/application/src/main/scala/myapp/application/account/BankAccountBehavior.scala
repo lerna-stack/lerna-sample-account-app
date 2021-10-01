@@ -16,11 +16,14 @@ import scala.concurrent.duration._
 
 object BankAccountBehavior extends AppTypedActorLogging {
 
+  /** 残高の上限値 */
+  val BalanceMaxLimit: BigInt = 10_000_000
+
   def typeKey(implicit tenant: AppTenant): ReplicatedEntityTypeKey[Command] =
     ReplicatedEntityTypeKey(s"BankAccount-${tenant.id}")
 
   sealed trait Command
-  final case class Deposit(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[DepositSucceeded])(implicit
+  final case class Deposit(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[DepositReply])(implicit
       val appRequestContext: AppRequestContext,
   ) extends Command
   final case class Withdraw(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[WithdrawReply])(implicit
@@ -31,8 +34,9 @@ object BankAccountBehavior extends AppTypedActorLogging {
   final case class ReceiveTimeout() extends Command
   final case class Stop()           extends Command
   sealed trait Reply
-  // DepositReply
-  final case class DepositSucceeded(balance: BigInt)  extends Reply
+  sealed trait DepositReply                           extends Reply
+  final case class DepositSucceeded(balance: BigInt)  extends DepositReply
+  final case class ExcessBalance()                    extends DepositReply
   sealed trait WithdrawReply                          extends Reply
   final case class ShortBalance()                     extends WithdrawReply
   final case class WithdrawSucceeded(balance: BigInt) extends WithdrawReply
@@ -43,6 +47,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
   @JsonSubTypes(
     Array(
       new JsonSubTypes.Type(name = "Deposited", value = classOf[Deposited]),
+      new JsonSubTypes.Type(name = "BalanceExceeded", value = classOf[BalanceExceeded]),
       new JsonSubTypes.Type(name = "Withdrew", value = classOf[Withdrew]),
       new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
     ),
@@ -50,15 +55,22 @@ object BankAccountBehavior extends AppTypedActorLogging {
   sealed trait DomainEvent {
     def appRequestContext: AppRequestContext
   }
+
+  sealed trait DepositDomainEvent extends DomainEvent
   final case class Deposited(transactionId: TransactionId, amount: BigInt)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends DepositDomainEvent
+  final case class BalanceExceeded(transactionId: TransactionId)(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends DepositDomainEvent
+
+  sealed trait WithdrawalDomainEvent extends DomainEvent
   final case class Withdrew(transactionId: TransactionId, amount: BigInt)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawalDomainEvent
   final case class BalanceShorted(transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawalDomainEvent
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
@@ -85,14 +97,29 @@ object BankAccountBehavior extends AppTypedActorLogging {
       command match {
         case command @ Deposit(transactionId, amount, replyTo) =>
           import command.appRequestContext
-          if (resentTransactions.contains(transactionId)) {
-            Effect.reply(replyTo)(DepositSucceeded(balance))
-          } else {
-            val event = Deposited(transactionId, amount)
-            Effect
-              .replicate[DomainEvent, Account](event)
-              .thenRun(logEvent(event, logger)(_))
-              .thenReply(replyTo)(state => DepositSucceeded(state.balance))
+          resentTransactions.get(transactionId) match {
+            // Receive a known transaction: replies message based on the stored event in recentTransactions
+            case Some(_: Deposited) =>
+              Effect.reply(replyTo)(DepositSucceeded(balance))
+            case Some(_: BalanceExceeded) =>
+              Effect.reply(replyTo)(ExcessBalance())
+            case Some(_: WithdrawalDomainEvent) =>
+              Effect.unhandled.thenNoReply()
+            // Receive an unknown transaction
+            case None =>
+              if (balance + amount > BalanceMaxLimit) {
+                val event = BalanceExceeded(transactionId)
+                Effect
+                  .replicate[DomainEvent, Account](event)
+                  .thenRun(logEvent(event, logger)(_))
+                  .thenReply(replyTo)(_ => ExcessBalance())
+              } else {
+                val event = Deposited(transactionId, amount)
+                Effect
+                  .replicate[DomainEvent, Account](event)
+                  .thenRun(logEvent(event, logger)(_))
+                  .thenReply(replyTo)(state => DepositSucceeded(state.balance))
+              }
           }
         case command @ Withdraw(transactionId, amount, replyTo) =>
           import command.appRequestContext
@@ -102,7 +129,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               Effect.reply(replyTo)(WithdrawSucceeded(balance))
             case Some(_: BalanceShorted) =>
               Effect.reply(replyTo)(ShortBalance())
-            case Some(_: Deposited) =>
+            case Some(_: DepositDomainEvent) =>
               Effect.unhandled.thenNoReply()
             // Receive an unknown transaction
             case None =>
@@ -131,6 +158,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
     def applyEvent(event: DomainEvent): Account =
       event match {
         case Deposited(transactionId, amount) => deposit(amount).recordEvent(transactionId, event)
+        case BalanceExceeded(transactionId)   => recordEvent(transactionId, event)
         case Withdrew(transactionId, amount)  => withdraw(amount).recordEvent(transactionId, event)
         case BalanceShorted(transactionId)    => recordEvent(transactionId, event)
       }
@@ -147,6 +175,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
   }
 
   object Account {
+
     private[BankAccountBehavior] class ResentTransactionsSerializerConverter
         extends StdConverter[ListMap[TransactionId, DomainEvent], List[(TransactionId, DomainEvent)]] {
       override def convert(value: ListMap[TransactionId, DomainEvent]): List[(TransactionId, DomainEvent)] =

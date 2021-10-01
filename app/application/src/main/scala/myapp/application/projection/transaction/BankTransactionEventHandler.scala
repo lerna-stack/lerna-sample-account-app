@@ -4,7 +4,7 @@ import akka.Done
 import akka.projection.eventsourced.EventEnvelope
 import lerna.log.AppLogging
 import myapp.application.account.{ BankAccountBehavior, BankAccountEventAdapter }
-import myapp.application.account.BankAccountBehavior.{ BalanceShorted, Deposited, Withdrew }
+import myapp.application.account.BankAccountBehavior.{ BalanceExceeded, BalanceShorted, Deposited, Withdrew }
 import myapp.application.persistence.AggregateEventTag
 import myapp.application.projection.AppEventHandler
 import myapp.utility.AppRequestContext
@@ -21,6 +21,9 @@ class BankTransactionEventHandler extends AppEventHandler[BankAccountBehavior.Do
     envelope.event match {
       case Deposited(transactionId, amount) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
+        DBIO.successful(Done)
+      case BalanceExceeded(transactionId) =>
+        logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
       case Withdrew(transactionId, amount) =>
         logger.info("Withdrew(transactionId: {}, amount: {})", transactionId, amount)
