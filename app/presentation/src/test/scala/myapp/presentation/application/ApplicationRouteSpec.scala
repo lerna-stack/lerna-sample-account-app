@@ -5,7 +5,12 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
-import myapp.adapter.account.BankAccountApplication.{ DepositResult, FetchBalanceResult, WithdrawalResult }
+import myapp.adapter.account.BankAccountApplication.{
+  DepositResult,
+  FetchBalanceResult,
+  RefundResult,
+  WithdrawalResult,
+}
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
@@ -31,6 +36,14 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     accountService.deposit(_, _, _)(_)
   private val withdraw: MockFunction4[AccountNo, TransactionId, BigInt, AppRequestContext, Future[WithdrawalResult]] =
     accountService.withdraw(_, _, _)(_)
+  private val refund: MockFunction5[
+    AccountNo,
+    TransactionId,
+    TransactionId,
+    BigInt,
+    AppRequestContext,
+    Future[RefundResult],
+  ] = accountService.refund(_, _, _, _)(_)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -262,6 +275,61 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         expect(status === StatusCodes.ServiceUnavailable)
       }
+    }
+
+    "refund the given amount into the account and then return the account balance" in {
+
+      refund
+        .expects(where { (accountNo, transactionId, withdrawalTransactionId, amount, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA &&
+          transactionId === TransactionId("refund1") &&
+          withdrawalTransactionId === TransactionId("withdrawal1") &&
+          amount === BigInt(100)
+        }).returns(Future.successful(RefundResult.Succeeded(400)))
+
+      Put("/accounts/123-456/refund?transactionId=refund1&withdrawalTransactionId=withdrawal1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.OK)
+        expect(responseAs[String] === "400\n")
+      }
+
+    }
+
+    "not refund due to an invalid argument" in {
+
+      refund
+        .expects(where { (accountNo, transactionId, withdrawalTransactionId, amount, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA &&
+          transactionId === TransactionId("refund1") &&
+          withdrawalTransactionId === TransactionId("withdrawal1") &&
+          amount === BigInt(100)
+        }).returns(Future.successful(RefundResult.InvalidArgument))
+
+      Put("/accounts/123-456/refund?transactionId=refund1&withdrawalTransactionId=withdrawal1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.BadRequest)
+      }
+
+    }
+
+    "return ServiceUnavailable if the account replies with a timeout against the refund request" in {
+
+      refund
+        .expects(where { (accountNo, transactionId, withdrawalTransactionId, amount, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA &&
+          transactionId === TransactionId("refund1") &&
+          withdrawalTransactionId === TransactionId("withdrawal1") &&
+          amount === BigInt(100)
+        }).returns(Future.successful(RefundResult.Timeout))
+
+      Put("/accounts/123-456/refund?transactionId=refund1&withdrawalTransactionId=withdrawal1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+      }
+
     }
 
   }

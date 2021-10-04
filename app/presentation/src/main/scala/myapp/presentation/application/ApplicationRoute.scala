@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import lerna.http.directives.RequestLogDirective
-import myapp.adapter.account.BankAccountApplication.FetchBalanceResult
+import myapp.adapter.account.BankAccountApplication.{ FetchBalanceResult, RefundResult }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.util.directives.AppRequestContextDirective
 
@@ -13,6 +13,8 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
     with RequestLogDirective {
   import ApplicationRoute._
 
+  // TODO refactor
+  @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
   def route: Route = concat(
     path("index") {
       complete(StatusCodes.OK -> "OK")
@@ -52,6 +54,22 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
                 }
               },
             )
+          },
+          // 動作確認のために返金機能を HTTP で公開する。
+          // 出金の取引ID等の検証は実施されないため、信頼できるクライアントからのアクセスのみを想定している。
+          (path("refund") &
+          parameters("transactionId".as[TransactionId], "withdrawalTransactionId".as[TransactionId], "amount".as[Int]) &
+          put) { (transactionId, withdrawalTransactionId, amount) =>
+            onSuccess(
+              bankAccountApplication.refund(accountNo, transactionId, withdrawalTransactionId, amount),
+            ) {
+              case RefundResult.Succeeded(balance) =>
+                complete(balance.toString + "\n")
+              case RefundResult.InvalidArgument =>
+                complete(StatusCodes.BadRequest)
+              case RefundResult.Timeout =>
+                complete(StatusCodes.ServiceUnavailable)
+            }
           },
         )
       }
