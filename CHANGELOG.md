@@ -16,6 +16,7 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
   - 残高確認、入金、出金でタイムアウトが発生した場合、`500 Internal Server Error` の代わりに `503 ServiceUnavailable` を返します
   - バッチ入金で残高超過が発生した場合、ERROR ログを出力して当該入金はスキップします
   - バッチ入金でタイムアウトが発生した場合、WARN ログを出力してバッチ入金処理を再起動します
+- 送金機能の実装に向けて、返金機能を実装しました [PR#28](https://github.com/lerna-stack/lerna-sample-account-app/pull/28)
 
 ### Fixed
 
