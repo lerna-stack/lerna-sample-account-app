@@ -5,7 +5,7 @@ import akka.util.Timeout
 import lerna.akka.entityreplication.typed._
 import lerna.akka.entityreplication.util.AtLeastOnceComplete
 import lerna.log.AppLogging
-import myapp.adapter.account.BankAccountApplication.{ DepositResult, FetchBalanceResult, WithdrawalResult }
+
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
@@ -15,6 +15,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends BankAccountApplication with AppLogging {
+  import BankAccountApplication._
   import system.executionContext
 
   private[this] val replication = ClusterReplication(system)
@@ -85,4 +86,27 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
           logger.warn(cause, "Could not get a response from the entity in the timeout({})", timeout)
           WithdrawalResult.Timeout
       }
+
+  override def refund(
+      accountNo: AccountNo,
+      transactionId: TransactionId,
+      withdrawalTransactionId: TransactionId,
+      amount: BigInt,
+  )(implicit appRequestContext: AppRequestContext): Future[BankAccountApplication.RefundResult] = {
+    val refundCommand = BankAccountBehavior.Refund(transactionId, withdrawalTransactionId, amount, _)
+    AtLeastOnceComplete
+      .askTo(entityRef(accountNo), refundCommand, retryInterval)
+      .map {
+        case BankAccountBehavior.RefundSucceeded(balance) =>
+          RefundResult.Succeeded(balance)
+        case BankAccountBehavior.InvalidRefundCommand() =>
+          RefundResult.InvalidArgument
+      }
+      .recover {
+        case cause: TimeoutException =>
+          logger.warn(cause, "Could not get a response from the entity in the timeout({})", timeout)
+          RefundResult.Timeout
+      }
+  }
+
 }
