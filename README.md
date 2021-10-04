@@ -64,10 +64,12 @@ sbt clean test:compile test
     上限を超えるような入金を行うことはできません。
 * [出金](#出金)
   * 口座の残高が0未満になるような出金を行うことはできません。
+* [返金](#返金)
+  * 返金によって口座残高が上限を超えることがあります。
 
 ### 冪等性を保証するためのID
 
-入金、出金には、冪等性を保証するために ID を指定します。  
+入金、出金、返金には、冪等性を保証するために ID を指定します。  
 この ID を、*取引ID* と呼びます。
 
 取引ID は、入金や出金などの用途ごとに区別されないことに注意してください。  
@@ -187,6 +189,47 @@ curl \
     --url "http://127.0.0.1:9001/accounts/test33/withdraw?transactionId=$(date '+%s')&amount=500" \
     --header 'X-Tenant-Id: tenant-a'
 ```
+
+#### 返金
+口座に指定金額を返金します。
+
+返金に成功すると、HTTPステータスコード 200 OK と 返金後の残高 を返します。
+返金金額が負数である等の不正なリクエストであった場合には、HTTPステータスコード 400 BadRequest を返します。
+返金処理でタイムアウトが発生した場合には、HTTPステータスコード 503 ServiceUnavailable を返します。
+
+返金でタイムアウトが発生した場合には、同じ 取引ID を指定してリトライすることができます。
+取引ID により冪等性が保証されています。
+同じ 取引ID を指定してリトライする場合、前回とまったく同じパラメータ(出金の取引ID、返金金額) を指定する必要があります。 
+異なるパラメータが指定された場合、このAPIは 400 BadRequest を返します。
+
+- method: `PUT`
+- path: `/accounts/${accountNo}/refund`
+- (query) parameters
+    - 取引ID: `transactionId` (string)
+    - 出金の取引ID: `withdrawalTransactionId` (string)
+    - 返金金額: `amount`
+- headers
+    - テナント: `X-Tenant-Id`: `${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'PUT' \
+    --url "http://127.0.0.1:9001/accounts/test33/refund?transactionId=$(date '+%s')&withdrawalTransactionId=unknown&amount=300" \
+    --header 'X-Tenant-Id: tenant-a'
+```
+
+※ Query Parameter である 出金の取引ID(`withdrawalTransactionId`) の値を、出金で使用した 取引ID の値に置き換えてください。
+例えば、取引ID が `withdraw-example-1` である出金に関連付けた返金を行う場合には、`withdrawalTransactionId=withdraw-example-1` と指定します。
+
+※このAPIは動作確認のために公開されており、信頼できるクライアントからのアクセスのみを想定しています。
+出金の取引ID は、出金と返金を関連づけるために使用できますが、次の内容は検証されません。
+* その出金の取引ID が存在するかどうか
+* その出金の取引ID が出金に対応するか
+
+出金の取引ID の妥当性は、このAPIの利用者が保証する必要があります。
+
 
 ## バッチ入金
 
