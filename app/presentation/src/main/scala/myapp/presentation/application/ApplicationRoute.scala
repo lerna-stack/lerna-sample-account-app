@@ -20,68 +20,75 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
     }
   }
 
-  // TODO refactor
-  @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
   def route: Route = concat(
     path("index") {
       complete(StatusCodes.OK -> "OK")
     },
     withinContextAndLogging { implicit appRequestContext =>
       pathPrefix("accounts" / Segment.map(AccountNo)) { accountNo =>
-        concat(
-          get {
-            onSuccess(bankAccountApplication.fetchBalance(accountNo)) {
-              case FetchBalanceResult.Succeeded(balance) =>
-                complete(balance.toString + "\n")
-              case FetchBalanceResult.Timeout =>
-                complete(StatusCodes.ServiceUnavailable)
-            }
-          },
-          (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
-            import BankAccountApplication._
-            concat(
-              path("deposit") {
-                onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) {
-                  case DepositResult.Succeeded(balance) =>
-                    complete(balance.toString + "\n")
-                  case DepositResult.ExcessBalance =>
-                    complete(StatusCodes.BadRequest, "Excess Balance\n")
-                  case DepositResult.Timeout =>
-                    complete(StatusCodes.ServiceUnavailable)
-                }
-              },
-              path("withdraw") {
-                onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
-                  case WithdrawalResult.Succeeded(balance) =>
-                    complete(balance.toString + "\n")
-                  case WithdrawalResult.ShortBalance =>
-                    complete(StatusCodes.BadRequest, "Short Balance\n")
-                  case WithdrawalResult.Timeout =>
-                    complete(StatusCodes.ServiceUnavailable)
-                }
-              },
-            )
-          },
-          // 動作確認のために返金機能を HTTP で公開する。
-          // 出金の取引ID等の検証は実施されないため、信頼できるクライアントからのアクセスのみを想定している。
-          (path("refund") &
-          parameters("transactionId".as[TransactionId], "withdrawalTransactionId".as[TransactionId], "amount".as[Int]) &
-          put) { (transactionId, withdrawalTransactionId, amount) =>
-            onSuccess(
-              bankAccountApplication.refund(accountNo, transactionId, withdrawalTransactionId, amount),
-            ) {
-              case RefundResult.Succeeded(balance) =>
-                complete(balance.toString + "\n")
-              case RefundResult.InvalidArgument =>
-                complete(StatusCodes.BadRequest)
-              case RefundResult.Timeout =>
-                complete(StatusCodes.ServiceUnavailable)
-            }
-          },
-        )
+        AccountRoute(accountNo)
       }
     },
   )
+
+  object AccountRoute {
+    // TODO refactor
+    @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
+    def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
+      concat(
+        get {
+          onSuccess(bankAccountApplication.fetchBalance(accountNo)) {
+            case FetchBalanceResult.Succeeded(balance) =>
+              complete(balance.toString + "\n")
+            case FetchBalanceResult.Timeout =>
+              complete(StatusCodes.ServiceUnavailable)
+          }
+        },
+        (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
+          import BankAccountApplication._
+          concat(
+            path("deposit") {
+              onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) {
+                case DepositResult.Succeeded(balance) =>
+                  complete(balance.toString + "\n")
+                case DepositResult.ExcessBalance =>
+                  complete(StatusCodes.BadRequest, "Excess Balance\n")
+                case DepositResult.Timeout =>
+                  complete(StatusCodes.ServiceUnavailable)
+              }
+            },
+            path("withdraw") {
+              onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
+                case WithdrawalResult.Succeeded(balance) =>
+                  complete(balance.toString + "\n")
+                case WithdrawalResult.ShortBalance =>
+                  complete(StatusCodes.BadRequest, "Short Balance\n")
+                case WithdrawalResult.Timeout =>
+                  complete(StatusCodes.ServiceUnavailable)
+              }
+            },
+          )
+        },
+        // 動作確認のために返金機能を HTTP で公開する。
+        // 出金の取引ID等の検証は実施されないため、信頼できるクライアントからのアクセスのみを想定している。
+        (path("refund") &
+        parameters("transactionId".as[TransactionId], "withdrawalTransactionId".as[TransactionId], "amount".as[Int]) &
+        put) { (transactionId, withdrawalTransactionId, amount) =>
+          onSuccess(
+            bankAccountApplication.refund(accountNo, transactionId, withdrawalTransactionId, amount),
+          ) {
+            case RefundResult.Succeeded(balance) =>
+              complete(balance.toString + "\n")
+            case RefundResult.InvalidArgument =>
+              complete(StatusCodes.BadRequest)
+            case RefundResult.Timeout =>
+              complete(StatusCodes.ServiceUnavailable)
+          }
+        },
+      )
+    }
+  }
+
 }
 
 object ApplicationRoute {
