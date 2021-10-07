@@ -182,8 +182,8 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   .thenReply(replyTo)(state => WithdrawSucceeded(state.balance))
               }
           }
-        case refundCommand: Refund =>
-          handleRefundCommand(refundCommand, logger)
+        case command: Refund =>
+          applyRefundCommand(command, logger)
         case GetBalance(replyTo) =>
           Effect.reply(replyTo)(AccountBalance(balance))
         case ReceiveTimeout() =>
@@ -192,7 +192,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
           Effect.stopLocally()
       }
 
-    private def handleRefundCommand(refundCommand: Refund, logger: AppLogger): Effect = {
+    private def applyRefundCommand(refundCommand: Refund, logger: AppLogger): Effect = {
       import refundCommand.appRequestContext
       val transactionId           = refundCommand.transactionId
       val withdrawalTransactionId = refundCommand.withdrawalTransactionId
