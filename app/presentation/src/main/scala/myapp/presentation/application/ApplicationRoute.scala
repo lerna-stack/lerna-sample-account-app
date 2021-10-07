@@ -2,28 +2,20 @@ package myapp.presentation.application
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{ Directive1, Route }
-import lerna.http.directives.RequestLogDirective
+import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
-import myapp.presentation.util.directives.AppRequestContextDirective
+import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
 
-class ApplicationRoute(bankAccountApplication: BankAccountApplication)
-    extends AppRequestContextDirective
-    with RequestLogDirective {
-  import ApplicationRoute._
+class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
 
-  private val withinContextAndLogging: Directive1[AppRequestContext] = {
-    extractAppRequestContext.flatMap { implicit appRequestContext =>
-      logRequestDirective & logRequestResultDirective & provide(appRequestContext)
-    }
-  }
+  import ApplicationRoute._
 
   def route: Route = concat(
     path("index") {
       complete(StatusCodes.OK -> "OK")
     },
-    withinContextAndLogging { implicit appRequestContext =>
+    withAppRequestContextAndLogging { implicit appRequestContext =>
       pathPrefix("accounts" / Segment.map(AccountNo)) { accountNo =>
         AccountRoute(accountNo)
       }
