@@ -192,12 +192,9 @@ object BankAccountBehavior extends AppTypedActorLogging {
           Effect.stopLocally()
       }
 
-    private def applyRefundCommand(refundCommand: Refund, logger: AppLogger): Effect = {
-      import refundCommand.appRequestContext
-      val transactionId           = refundCommand.transactionId
-      val withdrawalTransactionId = refundCommand.withdrawalTransactionId
-      val refundAmount            = refundCommand.amount
-      val replyTo                 = refundCommand.replyTo
+    private def applyRefundCommand(command: Refund, logger: AppLogger): Effect = {
+      import command.appRequestContext
+      val Refund(transactionId, withdrawalTransactionId, refundAmount, replyTo) = command
       resentTransactions.get(transactionId) match {
         case Some(refunded: Refunded) =>
           val isValidCommand = {
