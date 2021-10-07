@@ -44,22 +44,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
             withdrawRoute(accountNo, transactionId, amount),
           )
         },
-        // 動作確認のために返金機能を HTTP で公開する。
-        // 出金の取引ID等の検証は実施されないため、信頼できるクライアントからのアクセスのみを想定している。
-        (path("refund") &
-        parameters("transactionId".as[TransactionId], "withdrawalTransactionId".as[TransactionId], "amount".as[Int]) &
-        put) { (transactionId, withdrawalTransactionId, amount) =>
-          onSuccess(
-            bankAccountApplication.refund(accountNo, transactionId, withdrawalTransactionId, amount),
-          ) {
-            case RefundResult.Succeeded(balance) =>
-              complete(balance.toString + "\n")
-            case RefundResult.InvalidArgument =>
-              complete(StatusCodes.BadRequest)
-            case RefundResult.Timeout =>
-              complete(StatusCodes.ServiceUnavailable)
-          }
-        },
+        refundRoute(accountNo),
       )
     }
 
@@ -99,6 +84,26 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
           case WithdrawalResult.ShortBalance =>
             complete(StatusCodes.BadRequest, "Short Balance\n")
           case WithdrawalResult.Timeout =>
+            complete(StatusCodes.ServiceUnavailable)
+        }
+      }
+    }
+
+    // 動作確認のために返金機能を HTTP で公開する。
+    // 出金の取引ID等の検証は実施されないため、信頼できるクライアントからのアクセスのみを想定している。
+    private def refundRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
+      val refundParameters = parameters(
+        "transactionId".as[TransactionId],
+        "withdrawalTransactionId".as[TransactionId],
+        "amount".as[Int],
+      )
+      (path("refund") & put & refundParameters) { (transactionId, withdrawalTransactionId, amount) =>
+        onSuccess(bankAccountApplication.refund(accountNo, transactionId, withdrawalTransactionId, amount)) {
+          case RefundResult.Succeeded(balance) =>
+            complete(balance.toString + "\n")
+          case RefundResult.InvalidArgument =>
+            complete(StatusCodes.BadRequest)
+          case RefundResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
         }
       }
