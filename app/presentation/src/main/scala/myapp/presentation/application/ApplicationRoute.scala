@@ -41,16 +41,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
           import BankAccountApplication._
           concat(
-            path("deposit") {
-              onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) {
-                case DepositResult.Succeeded(balance) =>
-                  complete(balance.toString + "\n")
-                case DepositResult.ExcessBalance =>
-                  complete(StatusCodes.BadRequest, "Excess Balance\n")
-                case DepositResult.Timeout =>
-                  complete(StatusCodes.ServiceUnavailable)
-              }
-            },
+            depositRoute(accountNo, transactionId, amount),
             path("withdraw") {
               onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
                 case WithdrawalResult.Succeeded(balance) =>
@@ -88,6 +79,21 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
           case FetchBalanceResult.Succeeded(balance) =>
             complete(balance.toString + "\n")
           case FetchBalanceResult.Timeout =>
+            complete(StatusCodes.ServiceUnavailable)
+        }
+      }
+    }
+
+    private def depositRoute(accountNo: AccountNo, transactionId: TransactionId, amount: BigInt)(implicit
+        appRequestContext: AppRequestContext,
+    ): Route = {
+      path("deposit") {
+        onSuccess(bankAccountApplication.deposit(accountNo, transactionId, amount)) {
+          case DepositResult.Succeeded(balance) =>
+            complete(balance.toString + "\n")
+          case DepositResult.ExcessBalance =>
+            complete(StatusCodes.BadRequest, "Excess Balance\n")
+          case DepositResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
         }
       }
