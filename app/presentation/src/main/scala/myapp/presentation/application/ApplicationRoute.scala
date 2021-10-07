@@ -39,19 +39,9 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
       concat(
         fetchBalanceRoute(accountNo),
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
-          import BankAccountApplication._
           concat(
             depositRoute(accountNo, transactionId, amount),
-            path("withdraw") {
-              onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
-                case WithdrawalResult.Succeeded(balance) =>
-                  complete(balance.toString + "\n")
-                case WithdrawalResult.ShortBalance =>
-                  complete(StatusCodes.BadRequest, "Short Balance\n")
-                case WithdrawalResult.Timeout =>
-                  complete(StatusCodes.ServiceUnavailable)
-              }
-            },
+            withdrawRoute(accountNo, transactionId, amount),
           )
         },
         // 動作確認のために返金機能を HTTP で公開する。
@@ -94,6 +84,21 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
           case DepositResult.ExcessBalance =>
             complete(StatusCodes.BadRequest, "Excess Balance\n")
           case DepositResult.Timeout =>
+            complete(StatusCodes.ServiceUnavailable)
+        }
+      }
+    }
+
+    private def withdrawRoute(accountNo: AccountNo, transactionId: TransactionId, amount: BigInt)(implicit
+        appRequestContext: AppRequestContext,
+    ): Route = {
+      path("withdraw") {
+        onSuccess(bankAccountApplication.withdraw(accountNo, transactionId, amount)) {
+          case WithdrawalResult.Succeeded(balance) =>
+            complete(balance.toString + "\n")
+          case WithdrawalResult.ShortBalance =>
+            complete(StatusCodes.BadRequest, "Short Balance\n")
+          case WithdrawalResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
         }
       }
