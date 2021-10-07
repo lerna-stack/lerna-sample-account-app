@@ -33,8 +33,6 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
   object AccountRoute {
     import BankAccountApplication._
 
-    // TODO refactor
-    @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
     def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       concat(
         fetchBalanceRoute(accountNo),
