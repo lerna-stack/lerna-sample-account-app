@@ -2,16 +2,23 @@ package myapp.presentation.application
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{ Directive1, Route }
 import lerna.http.directives.RequestLogDirective
 import myapp.adapter.account.BankAccountApplication.{ FetchBalanceResult, RefundResult }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.presentation.util.directives.AppRequestContextDirective
+import myapp.utility.AppRequestContext
 
 class ApplicationRoute(bankAccountApplication: BankAccountApplication)
     extends AppRequestContextDirective
     with RequestLogDirective {
   import ApplicationRoute._
+
+  private val withinContextAndLogging: Directive1[AppRequestContext] = {
+    extractAppRequestContext.flatMap { implicit appRequestContext =>
+      logRequestDirective & logRequestResultDirective & provide(appRequestContext)
+    }
+  }
 
   // TODO refactor
   @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
@@ -19,8 +26,8 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication)
     path("index") {
       complete(StatusCodes.OK -> "OK")
     },
-    extractAppRequestContext { implicit appRequestContext =>
-      (logRequestDirective & logRequestResultDirective & pathPrefix("accounts" / Segment.map(AccountNo))) { accountNo =>
+    withinContextAndLogging { implicit appRequestContext =>
+      pathPrefix("accounts" / Segment.map(AccountNo)) { accountNo =>
         concat(
           get {
             onSuccess(bankAccountApplication.fetchBalance(accountNo)) {
