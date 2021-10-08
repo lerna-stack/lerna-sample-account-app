@@ -215,41 +215,53 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   // アクター外から使用することは想定しておらず、そのような使用を場合の動作は保証されない。
   //
 
+  /** 出金中に使用するコマンド */
+  sealed trait WithdrawingStateCommand extends Command
+
+  /** 入金中に使用するコマンド */
+  sealed trait DepositingStateCommand extends Command
+
+  /** 返金中に使用するコマンド */
+  sealed trait RefundingStateCommand extends Command
+
+  /** 取引完了後に使用するコマンド */
+  sealed trait TransactionCompletedStateCommand extends Command
+
   /** 送金元口座から出金する */
-  case object WithdrawFromSource extends Command
+  case object WithdrawFromSource extends WithdrawingStateCommand
 
   /** 送金元口座からの出金が完了した */
-  final case class WithdrawCompleted(result: WithdrawalResult) extends Command
+  final case class WithdrawCompleted(result: WithdrawalResult) extends WithdrawingStateCommand
 
   /** 送金元口座からの出金が予期しない例外で失敗した */
-  final case class WithdrawFailedWithUnexpectedException(cause: Throwable) extends Command
+  final case class WithdrawFailedWithUnexpectedException(cause: Throwable) extends WithdrawingStateCommand
 
   /** 送金先口座へ入金する */
-  case object DepositToDestination extends Command
+  case object DepositToDestination extends DepositingStateCommand
 
   /** 送金先口座への入金が完了した */
-  final case class DepositCompleted(result: DepositResult) extends Command
+  final case class DepositCompleted(result: DepositResult) extends DepositingStateCommand
 
   /** 送金先口座への入金が予期しない例外で失敗した */
-  final case class DepositFailedWithUnexpectedException(cause: Throwable) extends Command
+  final case class DepositFailedWithUnexpectedException(cause: Throwable) extends DepositingStateCommand
 
   /** 送金元口座へ返金する */
-  case object RefundToSource extends Command
+  case object RefundToSource extends RefundingStateCommand
 
   /** 送金元口座への返金が完了した */
-  final case class RefundCompleted(result: RefundResult) extends Command
+  final case class RefundCompleted(result: RefundResult) extends RefundingStateCommand
 
   /** 送金元口座への返金が予期しない例外で失敗した */
-  final case class RefundFailedWithUnexpectedException(cause: Throwable) extends Command
+  final case class RefundFailedWithUnexpectedException(cause: Throwable) extends RefundingStateCommand
 
   /** 送金を完了する */
-  case object CompleteTransaction extends Command
+  case object CompleteTransaction extends TransactionCompletedStateCommand
 
   /** コマンド:パッシベーション
     *
     * このアクターのパッシベーションを開始する。
     */
-  case object Passivate extends Command
+  case object Passivate extends TransactionCompletedStateCommand
 
   /** コマンド:状態取得
     *
@@ -293,6 +305,18 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
     def appRequestContext: AppRequestContext
   }
 
+  /** 送金取引開始時に発生するイベント */
+  sealed trait EmptyStateDomainEvent extends DomainEvent
+
+  /** 出金中に発生するイベント */
+  sealed trait WithdrawingStateDomainEvent extends DomainEvent
+
+  /** 入金中に発生するイベント */
+  sealed trait DepositingStateDomainEvent extends DomainEvent
+
+  /** 返金中に発生するイベント */
+  sealed trait RefundingStateDomainEvent extends DomainEvent
+
   /** 送金取引(トランザクション) を作成した */
   final case class TransactionCreated(
       sourceAccountNo: AccountNo,
@@ -303,7 +327,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       refundTransactionId: TransactionId,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends EmptyStateDomainEvent
 
   /** 出金に成功した */
   final case class WithdrawalSucceeded(
@@ -312,7 +336,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawingStateDomainEvent
 
   /** 入金に成功した */
   final case class DepositSucceeded(
@@ -321,7 +345,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends DepositingStateDomainEvent
 
   /** 返金に成功した */
   final case class RefundSucceeded(
@@ -331,7 +355,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends RefundingStateDomainEvent
 
   /** 送金失敗:不正な送金を要求された */
   final case class InvalidRemittanceRequested(
@@ -340,7 +364,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends EmptyStateDomainEvent
 
   /** 送金失敗:残高不足 */
   final case class BalanceShorted(
@@ -349,7 +373,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends WithdrawingStateDomainEvent
 
   /** 送金失敗:残高超過 */
   final case class BalanceExceeded(
@@ -358,7 +382,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       amount: BigInt,
   )(implicit
       val appRequestContext: AppRequestContext,
-  ) extends DomainEvent
+  ) extends DepositingStateDomainEvent
 
   final case class Context(
       settings: Settings,
@@ -555,7 +579,8 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             Effect.stop()
           case command: InspectState =>
             applyInspectState(command)
-          case _ =>
+          case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand |
+              _: TransactionCompletedStateCommand =>
             // Make and use an unknown context since this state is not bounded to any request.
             implicit val unknown: AppRequestContext = AppRequestContext(TraceId.unknown, tenant)
             ignoreUnexpectedCommand(context, command)
@@ -625,7 +650,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               destinationAccountNo,
               amount,
             )(invalidRemittanceRequested.appRequestContext)
-          case _ =>
+          case _: WithdrawingStateDomainEvent | _: DepositingStateDomainEvent | _: RefundingStateDomainEvent =>
             // Make and use an unknown context since this state is not bounded to any request.
             implicit val unknown: AppRequestContext = AppRequestContext(TraceId.unknown, tenant)
             throwIllegalStateException(context, event)
@@ -671,7 +696,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             Effect.stop()
           case command: InspectState =>
             applyInspectState(command)
-          case _ =>
+          case _: DepositingStateCommand | _: RefundingStateCommand | _: TransactionCompletedStateCommand =>
             ignoreUnexpectedCommand(context, command)
         }
       }
@@ -765,7 +790,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               refundTransactionId,
               ShortBalance,
             )
-          case _ =>
+          case _: EmptyStateDomainEvent | _: DepositingStateDomainEvent | _: RefundingStateDomainEvent =>
             throwIllegalStateException(context, event)
         }
       }
@@ -797,7 +822,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             Effect.stop()
           case command: InspectState =>
             applyInspectState(command)
-          case _ =>
+          case _: WithdrawingStateCommand | _: RefundingStateCommand | _: TransactionCompletedStateCommand =>
             ignoreUnexpectedCommand(context, command)
         }
       }
@@ -892,7 +917,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               depositTransactionId,
               refundTransactionId,
             )
-          case _ =>
+          case _: EmptyStateDomainEvent | _: WithdrawingStateDomainEvent | _: RefundingStateDomainEvent =>
             throwIllegalStateException(context, event)
         }
       }
@@ -932,7 +957,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           Effect.stop()
         case command: InspectState =>
           applyInspectState(command)
-        case _ =>
+        case _: WithdrawingStateCommand | _: DepositingStateCommand | _: TransactionCompletedStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
 
@@ -1032,7 +1057,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               refundTransactionId,
               failureReply,
             )
-          case _ =>
+          case _: EmptyStateDomainEvent | _: WithdrawingStateDomainEvent | _: DepositingStateDomainEvent =>
             throwIllegalStateException(context, event)
         }
       }
@@ -1072,7 +1097,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           Effect.stop()
         case command: InspectState =>
           applyInspectState(command)
-        case _ =>
+        case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
       override def applyEvent(context: Context, event: DomainEvent): State = {
@@ -1106,7 +1131,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           Effect.stop()
         case command: InspectState =>
           applyInspectState(command)
-        case _ =>
+        case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
       override def applyEvent(context: Context, event: DomainEvent): State = {
@@ -1132,7 +1157,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           Effect.stop()
         case command: InspectState =>
           applyInspectState(command)
-        case _ =>
+        case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
       override def applyEvent(context: Context, event: DomainEvent): State = {
