@@ -1909,6 +1909,64 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
+      "restart while preserving stashed commands if a journal failure occurs, and then resume its behavior" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+
+        val bankAccountApplication = mock[BankAccountApplication]
+        // Withdrawal will be called twice
+        // since the first WithdrawalSucceeded persisting will fail due to a journal failure.
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, *, remittanceAmount, appRequestContext)
+          .twice()
+          .returns(Future.successful(WithdrawalResult.Succeeded(0)))
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, *, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
+
+        val callbacks = mock[Context.Callbacks]
+        // onRecoveryCompleted will be called twice
+        // since the orchestrator restarts due to a journal failure.
+        (callbacks.onRecoveryCompleted _)
+          .expects(*, *)
+          .twice()
+          .onCall(Context.DefaultCallbacks.onRecoveryCompleted _)
+        (callbacks.onTransactionCreated _)
+          .expects(*, *, *, *)
+          .onCall { (context, oldState, newState, remitCommand) =>
+            // Once the orchestrator persist a transaction,
+            // the orchestrator will resume its behavior even if a journal failure occurs.
+            // This test emulate that the first WithdrawalSucceeded persisting will fail and then the second one will succeed.
+            persistenceTestKit.failNextPersisted()
+            Context.DefaultCallbacks.onTransactionCreated(context, oldState, newState, remitCommand)
+          }
+        (callbacks.onWithdrawSucceeded _)
+          .expects(*, *, *)
+          .onCall(Context.DefaultCallbacks.onWithdrawSucceeded _)
+        (callbacks.onDepositSucceeded _)
+          .expects(*, *, *)
+          .onCall(Context.DefaultCallbacks.onDepositSucceeded _)
+
+        val (persistenceId, orchestratorBehavior) =
+          createBehavior(State.Empty(tenant), bankAccountApplication, callbacks = callbacks)
+        val orchestrator = spawn(orchestratorBehavior)
+
+        val replyProbe = testKit.createTestProbe[RemitReply]()
+        orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
+
+        replyProbe.expectMessage(RemitSucceeded)
+        persistenceTestKit.expectNextPersistedType[TransactionCreated](persistenceId.id)
+        persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
+        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
+        expectStateEventually[State.Succeeded](orchestrator)
+
+      }
+
     }
 
   }
