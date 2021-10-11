@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.annotation.{ JsonDeserialize, JsonSerializ
 import com.fasterxml.jackson.databind.util.StdConverter
 import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
+import lerna.util.lang.Equals._
 import myapp.adapter.account.TransactionId
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
@@ -29,6 +30,15 @@ object BankAccountBehavior extends AppTypedActorLogging {
   final case class Withdraw(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[WithdrawReply])(implicit
       val appRequestContext: AppRequestContext,
   ) extends Command
+  final case class Refund(
+      transactionId: TransactionId,
+      withdrawalTransactionId: TransactionId,
+      amount: BigInt,
+      replyTo: ActorRef[RefundReply],
+  )(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends Command
+
   final case class GetBalance(replyTo: ActorRef[AccountBalance])(implicit val appRequestContext: AppRequestContext)
       extends Command
   final case class ReceiveTimeout() extends Command
@@ -40,6 +50,10 @@ object BankAccountBehavior extends AppTypedActorLogging {
   sealed trait WithdrawReply                          extends Reply
   final case class ShortBalance()                     extends WithdrawReply
   final case class WithdrawSucceeded(balance: BigInt) extends WithdrawReply
+  sealed trait RefundReply                            extends Reply
+  final case class RefundSucceeded(balance: BigInt)   extends RefundReply
+  final case class InvalidRefundCommand()             extends RefundReply
+
   // GetBalanceReply
   final case class AccountBalance(balance: BigInt) extends Reply
 
@@ -50,6 +64,8 @@ object BankAccountBehavior extends AppTypedActorLogging {
       new JsonSubTypes.Type(name = "BalanceExceeded", value = classOf[BalanceExceeded]),
       new JsonSubTypes.Type(name = "Withdrew", value = classOf[Withdrew]),
       new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
+      new JsonSubTypes.Type(name = "Refunded", value = classOf[Refunded]),
+      new JsonSubTypes.Type(name = "InvalidRefundRequested", value = classOf[InvalidRefundRequested]),
     ),
   )
   sealed trait DomainEvent {
@@ -72,6 +88,22 @@ object BankAccountBehavior extends AppTypedActorLogging {
       val appRequestContext: AppRequestContext,
   ) extends WithdrawalDomainEvent
 
+  sealed trait RefundDomainEvent extends DomainEvent
+  final case class Refunded(
+      transactionId: TransactionId,
+      withdrawalTransactionId: TransactionId,
+      amount: BigInt,
+  )(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends RefundDomainEvent
+  final case class InvalidRefundRequested(
+      transactionId: TransactionId,
+      withdrawalTransactionId: TransactionId,
+      amount: BigInt,
+  )(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends RefundDomainEvent
+
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
   final case class Account(
@@ -86,6 +118,9 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
     def withdraw(amount: BigInt): Account =
       copy(balance = balance - amount)
+
+    def refund(amount: BigInt): Account =
+      copy(balance = balance + amount)
 
     private[this] val maxResentTransactionSize = 30
 
@@ -103,7 +138,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               Effect.reply(replyTo)(DepositSucceeded(balance))
             case Some(_: BalanceExceeded) =>
               Effect.reply(replyTo)(ExcessBalance())
-            case Some(_: WithdrawalDomainEvent) =>
+            case Some(_: WithdrawalDomainEvent) | Some(_: RefundDomainEvent) =>
               Effect.unhandled.thenNoReply()
             // Receive an unknown transaction
             case None =>
@@ -129,7 +164,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               Effect.reply(replyTo)(WithdrawSucceeded(balance))
             case Some(_: BalanceShorted) =>
               Effect.reply(replyTo)(ShortBalance())
-            case Some(_: DepositDomainEvent) =>
+            case Some(_: DepositDomainEvent) | Some(_: RefundDomainEvent) =>
               Effect.unhandled.thenNoReply()
             // Receive an unknown transaction
             case None =>
@@ -147,6 +182,8 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   .thenReply(replyTo)(state => WithdrawSucceeded(state.balance))
               }
           }
+        case command: Refund =>
+          applyRefundCommand(command, logger)
         case GetBalance(replyTo) =>
           Effect.reply(replyTo)(AccountBalance(balance))
         case ReceiveTimeout() =>
@@ -155,12 +192,64 @@ object BankAccountBehavior extends AppTypedActorLogging {
           Effect.stopLocally()
       }
 
+    private def applyRefundCommand(command: Refund, logger: AppLogger): Effect = {
+      import command.appRequestContext
+      val Refund(transactionId, withdrawalTransactionId, refundAmount, replyTo) = command
+      resentTransactions.get(transactionId) match {
+        case Some(refunded: Refunded) =>
+          val isValidCommand = {
+            refunded.withdrawalTransactionId === withdrawalTransactionId &&
+            refunded.amount === refundAmount
+          }
+          if (isValidCommand) {
+            Effect.unhandled
+              .thenRun { _: Account =>
+                logger.info(
+                  "[{}] The refund for {} is already succeeded",
+                  transactionId,
+                  withdrawalTransactionId,
+                )
+              }
+              .thenReply(replyTo)(_ => RefundSucceeded(balance))
+          } else {
+            Effect.unhandled
+              .thenRun { _: Account =>
+                logger.info(
+                  "[{}] The command has different parameters({},{}) than previous command's parameters",
+                  transactionId,
+                  withdrawalTransactionId,
+                  refundAmount,
+                )
+              }
+              .thenReply(replyTo)(_ => InvalidRefundCommand())
+          }
+        case Some(_: InvalidRefundRequested) | Some(_: DepositDomainEvent) | Some(_: WithdrawalDomainEvent) =>
+          Effect.reply(replyTo)(InvalidRefundCommand())
+        case None =>
+          if (refundAmount <= 0) {
+            val event = InvalidRefundRequested(transactionId, withdrawalTransactionId, refundAmount)
+            Effect
+              .replicate[DomainEvent, Account](event)
+              .thenRun(logEvent(event, logger)(_))
+              .thenReply(replyTo)(_ => InvalidRefundCommand())
+          } else {
+            val event = Refunded(transactionId, withdrawalTransactionId, refundAmount)
+            Effect
+              .replicate[DomainEvent, Account](event)
+              .thenRun(logEvent(event, logger)(_))
+              .thenReply(replyTo)(state => RefundSucceeded(state.balance))
+          }
+      }
+    }
+
     def applyEvent(event: DomainEvent): Account =
       event match {
-        case Deposited(transactionId, amount) => deposit(amount).recordEvent(transactionId, event)
-        case BalanceExceeded(transactionId)   => recordEvent(transactionId, event)
-        case Withdrew(transactionId, amount)  => withdraw(amount).recordEvent(transactionId, event)
-        case BalanceShorted(transactionId)    => recordEvent(transactionId, event)
+        case Deposited(transactionId, amount)            => deposit(amount).recordEvent(transactionId, event)
+        case BalanceExceeded(transactionId)              => recordEvent(transactionId, event)
+        case Withdrew(transactionId, amount)             => withdraw(amount).recordEvent(transactionId, event)
+        case BalanceShorted(transactionId)               => recordEvent(transactionId, event)
+        case Refunded(transactionId, _, amount)          => refund(amount).recordEvent(transactionId, event)
+        case InvalidRefundRequested(transactionId, _, _) => recordEvent(transactionId, event)
       }
 
     private[this] def logEvent(event: DomainEvent, logger: AppLogger)(

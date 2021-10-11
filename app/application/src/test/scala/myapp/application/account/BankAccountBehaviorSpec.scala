@@ -7,10 +7,16 @@ import lerna.util.trace.TraceId
 import myapp.adapter.account.TransactionId
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.TenantA
-import org.scalatest.BeforeAndAfterEach
+import org.scalatest.{ BeforeAndAfterEach, Inside }
 import org.scalatest.wordspec.AnyWordSpecLike
 
-class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyWordSpecLike with BeforeAndAfterEach {
+import java.util.UUID
+
+class BankAccountBehaviorSpec
+    extends ScalaTestWithTypedActorTestKit()
+    with AnyWordSpecLike
+    with BeforeAndAfterEach
+    with Inside {
 
   import BankAccountBehavior._
 
@@ -30,6 +36,10 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
   }
 
   implicit private val appRequestContext: AppRequestContext = AppRequestContext(TraceId.unknown, tenant)
+
+  private def generateRandomTraceId(): TraceId = {
+    TraceId(UUID.randomUUID().toString)
+  }
 
   "A BankAccountBehavior" should {
 
@@ -83,7 +93,7 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       secondExcessBalanceResult.replyOfType[ExcessBalance]
     }
 
-    "not handle a Deposit request with a transactionId that is associated with a Withdraw request" in {
+    "not handle a Deposit request with a transactionId that is associated with another command" in {
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply](Deposit(initialDepositId, amount = 1000, _))
@@ -145,7 +155,7 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       secondWithdrawalResult.replyOfType[ShortBalance]
     }
 
-    "not handle a Withdraw request with a transactionId that is associated with a Deposit request" in {
+    "not handle a Withdraw command with a transactionId that is associated with another command" in {
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply](Deposit(initialDepositId, amount = 1000, _))
@@ -210,5 +220,238 @@ class BankAccountBehaviorSpec extends ScalaTestWithTypedActorTestKit() with AnyW
       bankAccountTestKit.restart()
       bankAccountTestKit.state.balance should be(500)
     }
+
+    "refund the given amount when it receives a Refund command" in {
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val refundId      = TransactionId("3")
+      val refundAmount  = withdrawalAmount
+      val refundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, refundAmount, _)(refundContext),
+        )
+      val refunded = inside(refundResult.eventOfType[Refunded]) { event =>
+        event.transactionId should be(refundId)
+        event.withdrawalTransactionId should be(withdrawalId)
+        event.appRequestContext should be(refundContext)
+        event.amount should be(refundAmount)
+        event
+      }
+      inside(refundResult.state) { account =>
+        account.balance should be(1000)
+        account.resentTransactions(refundId) should be(refunded)
+      }
+      refundResult.replyOfType[RefundSucceeded].balance should be(1000)
+
+    }
+
+    "refund the given amount even if the refunded balance is greater than BalanceMaxLimit" in {
+
+      val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = balanceMaxLimit, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
+
+      val withdrawalId = TransactionId("2")
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = balanceMaxLimit, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(0)
+
+      val secondDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("3"), 1, _))
+      secondDepositResult.replyOfType[DepositSucceeded].balance should be(1)
+
+      val refundId      = TransactionId("4")
+      val refundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, balanceMaxLimit, _)(refundContext),
+        )
+      val refunded = inside(refundResult.eventOfType[Refunded]) { event =>
+        event.transactionId should be(refundId)
+        event.withdrawalTransactionId should be(withdrawalId)
+        event.appRequestContext should be(refundContext)
+        event.amount should be(balanceMaxLimit)
+        event
+      }
+      val expectedBalance = balanceMaxLimit + 1
+      inside(refundResult.state) { account =>
+        account.balance should be(expectedBalance)
+        account.resentTransactions(refundId) should be(refunded)
+      }
+      refundResult.replyOfType[RefundSucceeded].balance should be(expectedBalance)
+
+    }
+
+    "reject a Refund command with a negative amount" in {
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId = TransactionId("2")
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = 300, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val refundId             = TransactionId("3")
+      val negativeRefundAmount = -1
+      val refundContext        = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, negativeRefundAmount, _)(refundContext),
+        )
+      val invalidRefundRequested = inside(refundResult.eventOfType[InvalidRefundRequested]) { event =>
+        event.transactionId should be(refundId)
+        event.withdrawalTransactionId should be(withdrawalId)
+        event.appRequestContext should be(refundContext)
+        event.amount should be(negativeRefundAmount)
+        event
+      }
+      inside(refundResult.state) { account =>
+        account.balance should be(700)
+        account.resentTransactions(refundId) should be(invalidRefundRequested)
+      }
+      refundResult.replyOfType[InvalidRefundCommand]
+
+    }
+
+    "not refund the given amount if a second Refund command has the same transactionId as the first command" in {
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val refundId     = TransactionId("3")
+      val refundAmount = withdrawalAmount
+      val firstRefundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, refundAmount, _),
+        )
+      firstRefundResult.replyOfType[RefundSucceeded].balance should be(1000)
+
+      val secondRefundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val secondRefundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, refundAmount, _)(secondRefundContext),
+        )
+      secondRefundResult.hasNoEvents should be(true)
+      secondRefundResult.replyOfType[RefundSucceeded].balance should be(1000)
+
+    }
+
+    "reject a second Refund command if the second command has the same transactionId but a different withdrawalTransactionId" in {
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val anotherWithdrawalId = TransactionId("3")
+      val anotherWithdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(anotherWithdrawalId, amount = 500, _))
+      anotherWithdrawalResult.replyOfType[WithdrawSucceeded].balance should be(200)
+
+      val refundId           = TransactionId("4")
+      val refundAmount       = withdrawalAmount
+      val firstRefundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val firstRefundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, refundAmount, _)(firstRefundContext),
+        )
+      firstRefundResult.replyOfType[RefundSucceeded].balance should be(500)
+
+      val secondRefundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val secondRefundResult = {
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, anotherWithdrawalId, refundAmount, _)(secondRefundContext),
+        )
+      }
+      secondRefundResult.hasNoEvents should be(true)
+      secondRefundResult.replyOfType[InvalidRefundCommand]
+
+    }
+
+    "reject a second Refund command if the second command has the same transactionId but a different amount" in {
+
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val refundId           = TransactionId("3")
+      val firstRefundAmount  = withdrawalAmount
+      val firstRefundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val firstRefundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, firstRefundAmount, _)(firstRefundContext),
+        )
+      firstRefundResult.replyOfType[RefundSucceeded].balance should be(1000)
+
+      val secondRefundAmount = firstRefundAmount + 1
+      assert(secondRefundAmount !== firstRefundAmount, "The second refund amount should not equal to the first one.")
+      val secondRefundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val secondRefundResult = {
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, secondRefundAmount, _)(secondRefundContext),
+        )
+      }
+      secondRefundResult.hasNoEvents should be(true)
+      secondRefundResult.replyOfType[InvalidRefundCommand]
+
+    }
+
+    "reject a Refund command with a transactionId that is already associated with another command" in {
+
+      val initialDepositId = TransactionId("1")
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(initialDepositId, amount = 1000, _))
+      initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
+
+      val refundId      = initialDepositId // Assign already used TransactionId
+      val refundAmount  = withdrawalAmount
+      val refundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(refundId, withdrawalId, refundAmount, _)(refundContext),
+        )
+      refundResult.hasNoEvents should be(true)
+      refundResult.replyOfType[InvalidRefundCommand]
+
+    }
+
   }
 }
