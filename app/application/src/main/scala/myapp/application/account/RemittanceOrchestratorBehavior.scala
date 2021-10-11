@@ -7,7 +7,6 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.cluster.sharding.typed.scaladsl.{ ClusterSharding, Entity, EntityTypeKey }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
-import com.fasterxml.jackson.annotation.{ JsonSubTypes, JsonTypeInfo }
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import lerna.util.lang.Equals._
 import lerna.util.trace.TraceId
@@ -290,17 +289,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
     */
   final case class InspectStateReply(state: State) extends Reply with NoSerializationVerificationNeeded
 
-  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
-  @JsonSubTypes(
-    Array(
-      new JsonSubTypes.Type(name = "TransactionCreated", value = classOf[TransactionCreated]),
-      new JsonSubTypes.Type(name = "WithdrawalSucceeded", value = classOf[WithdrawalSucceeded]),
-      new JsonSubTypes.Type(name = "DepositSucceeded", value = classOf[DepositSucceeded]),
-      new JsonSubTypes.Type(name = "InvalidRemittanceRequested", value = classOf[InvalidRemittanceRequested]),
-      new JsonSubTypes.Type(name = "BalanceShorted", value = classOf[BalanceShorted]),
-      new JsonSubTypes.Type(name = "BalanceExceeded", value = classOf[BalanceExceeded]),
-    ),
-  )
   sealed trait DomainEvent {
     def appRequestContext: AppRequestContext
   }
