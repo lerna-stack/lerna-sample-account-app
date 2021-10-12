@@ -958,7 +958,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                      |Though we might have to recover this failure by human operations, this will retry refund again after ${delay.toString}.
                      |""".stripMargin
                 context.logError(state, message)
-                context.timers.startSingleTimer(TimerKeys.RetryDeposit, RefundToSource, delay)
+                context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }
           case RefundResult.Timeout =>
             Effect.none
