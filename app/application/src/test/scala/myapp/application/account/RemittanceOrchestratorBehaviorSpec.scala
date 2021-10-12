@@ -1,10 +1,18 @@
 package myapp.application.account
 
-import akka.actor.testkit.typed.scaladsl.LoggingTestKit
+import akka.actor.testkit.typed.scaladsl.{ LoggingTestKit, TestProbe }
 import akka.actor.typed.{ ActorRef, Behavior }
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.persistence.testkit.scaladsl.PersistenceTestKit
-import akka.persistence.testkit.{ PersistenceTestKitPlugin, PersistenceTestKitSnapshotPlugin }
+import akka.persistence.testkit.{
+  EventStorage,
+  JournalOperation,
+  PersistenceTestKitPlugin,
+  PersistenceTestKitSnapshotPlugin,
+  ProcessingResult,
+  ProcessingSuccess,
+  StorageFailure,
+}
 import akka.persistence.typed.PersistenceId
 import com.typesafe.config.ConfigFactory
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
@@ -95,6 +103,7 @@ final class RemittanceOrchestratorBehaviorSpec
   override def beforeEach(): Unit = {
     super.beforeEach()
     persistenceTestKit.clearAll()
+    persistenceTestKit.resetPolicy()
   }
 
   private def expectStateEventually[T: ClassTag](orchestrator: ActorRef[Command]): T = {
@@ -115,8 +124,8 @@ final class RemittanceOrchestratorBehaviorSpec
       initialState: State,
       bankAccountApplication: BankAccountApplication,
       shard: ActorRef[ClusterSharding.ShardCommand] = createTestProbe[ClusterSharding.ShardCommand]().ref,
+      self: Option[ActorRef[Command]] = None,
       transactionIdFactory: Context.TransactionIdFactory = Context.DefaultTransactionIdFactory,
-      callbacks: Context.Callbacks = Context.DefaultCallbacks,
   ): (PersistenceId, Behavior[Command]) = {
     val entityId      = EntityId(UUID.randomUUID().toString)
     val persistenceId = PersistenceId(typeKey(tenant).name, entityId.value)
@@ -126,27 +135,48 @@ final class RemittanceOrchestratorBehaviorSpec
       settings,
       bankAccountApplication,
       shard,
+      self,
       initialState,
       transactionIdFactory,
-      callbacks,
     )
     (persistenceId, behavior)
+  }
+
+  private def spawnWithSelfProbe(
+      initialState: State,
+      bankAccountApplication: BankAccountApplication,
+      shard: ActorRef[ClusterSharding.ShardCommand] = createTestProbe[ClusterSharding.ShardCommand]().ref,
+      transactionIdFactory: Context.TransactionIdFactory = Context.DefaultTransactionIdFactory,
+  ): (ActorRef[Command], PersistenceId, TestProbe[Command]) = {
+    val probe = createTestProbe[Command]()
+    val (persistenceId, orchestratorBehavior) =
+      createBehavior(initialState, bankAccountApplication, shard, self = Option(probe.ref), transactionIdFactory)
+    val orchestrator = spawn(orchestratorBehavior)
+
+    // Consumes a command emitted by onRecoveryCompleted
+    initialState match {
+      case _: State.Empty =>
+      // Do nothing
+      case _: State.WithdrawingFromSource =>
+        probe.expectMessage(WithdrawFromSource)
+      case _: State.DepositingToDestination =>
+        probe.expectMessage(DepositToDestination)
+      case _: State.RefundingToSource =>
+        probe.expectMessage(RefundToSource)
+      case _: State.TransactionCompletedState =>
+      // Do nothing
+    }
+
+    (orchestrator, persistenceId, probe)
   }
 
   "RemittanceOrchestratorBehavior" when {
 
     def verifyThatOrchestratorStopsWhenItReceivesStopCommand(state: State): Unit = {
       val bankAccountApplication = mock[BankAccountApplication]
-      val callbacks              = mock[Context.Callbacks]
-      // We should not delegate to the DefaultCallbacks
-      // since the DefaultCallbacks might send an internal command that depends on BankAccountApplication.
-      (callbacks.onRecoveryCompleted _)
-        .expects(*, state)
-        .returns(())
 
-      val (_, orchestratorBehavior) =
-        createBehavior(state, bankAccountApplication, callbacks = callbacks)
-      val orchestrator = spawn(orchestratorBehavior)
+      val (orchestrator, _, _) =
+        spawnWithSelfProbe(state, bankAccountApplication)
 
       val probe = createTestProbe[Command]()
       orchestrator ! Stop
@@ -155,16 +185,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
     def verifyThatOrchestratorLogsUnexpectedReceivedCommandAsWarn(state: State, command: Command): Unit = {
       val bankAccountApplication = mock[BankAccountApplication]
-      val callbacks              = mock[Context.Callbacks]
-      // We should not delegate to the DefaultCallbacks
-      // since the DefaultCallbacks might send an internal command that depends on BankAccountApplication.
-      (callbacks.onRecoveryCompleted _)
-        .expects(*, state)
-        .returns(())
 
-      val (_, orchestratorBehavior) =
-        createBehavior(state, bankAccountApplication, callbacks = callbacks)
-      val orchestrator = spawn(orchestratorBehavior)
+      val (orchestrator, _, _) =
+        spawnWithSelfProbe(state, bankAccountApplication)
 
       LoggingTestKit
         .warn(s"Unexpected command ${command.toString}")
@@ -175,16 +198,10 @@ final class RemittanceOrchestratorBehaviorSpec
 
     def verifyThatOrchestratorSendPassivateToShardAfterPassivateTimeout(state: State): Unit = {
       val bankAccountApplication = mock[BankAccountApplication]
-      val callbacks              = mock[Context.Callbacks]
-      // We should delegate to the DefaultCallbacks
-      // since the DefaultCallbacks will send a Passivate command, which we want to verify.
-      (callbacks.onRecoveryCompleted _)
-        .expects(*, state)
-        .onCall(Context.DefaultCallbacks.onRecoveryCompleted _)
 
       val shardProbe = createTestProbe[ClusterSharding.ShardCommand]()
       val (_, orchestratorBehavior) =
-        createBehavior(state, bankAccountApplication, shard = shardProbe.ref, callbacks = callbacks)
+        createBehavior(state, bankAccountApplication, shard = shardProbe.ref)
       val orchestrator = spawn(orchestratorBehavior)
 
       // Wait enough longer than the passivateTimeout.
@@ -194,16 +211,15 @@ final class RemittanceOrchestratorBehaviorSpec
 
     def verifyThatOrchestratorDontSendPassivateToShardAfterPassivateTimeout(state: State): Unit = {
       val bankAccountApplication = mock[BankAccountApplication]
-      val callbacks              = mock[Context.Callbacks]
-      // We should not delegate to the DefaultCallbacks
-      // since the DefaultCallbacks send an internal command to the orchestrator.
-      (callbacks.onRecoveryCompleted _)
-        .expects(*, state)
-        .returns(())
 
       val shardProbe = createTestProbe[ClusterSharding.ShardCommand]()
       val (_, orchestratorBehavior) =
-        createBehavior(state, bankAccountApplication, shard = shardProbe.ref, callbacks = callbacks)
+        createBehavior(
+          state,
+          bankAccountApplication,
+          shard = shardProbe.ref,
+          self = Option(createTestProbe[Command]().ref),
+        )
       val _ = spawn(orchestratorBehavior)
 
       // Wait enough longer than the passivateTimeout.
@@ -225,24 +241,12 @@ final class RemittanceOrchestratorBehaviorSpec
         val expectedDepositTransactionId    = TransactionId("2")
         val expectedRefundTransactionId     = TransactionId("3")
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, emptyState)
-          .returns(())
-        (callbacks.onTransactionCreated _)
-          .expects(where { (_, oldState, newState, _) =>
-            oldState === emptyState &&
-            newState.isInstanceOf[State.WithdrawingFromSource]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(
             emptyState,
             bankAccountApplication,
             transactionIdFactory = transactionIdFactory,
-            callbacks = callbacks,
           )
-        val orchestrator = spawn(orchestratorBehavior)
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val sourceAccountNo                               = AccountNo("source")
@@ -272,24 +276,17 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.refundTransactionId === expectedRefundTransactionId)
         }
 
+        selfProbe.expectMessage(remitCommand)
+        selfProbe.expectMessage(WithdrawFromSource)
+
       }
 
       "reject a Remit command that has the same source and destination account, persist a InvalidRemittanceRequested event, and then move to a EarlyFailed state" in {
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, emptyState)
-        (callbacks.onInvalidRemitRequested _)
-          .expects(where { (_, oldState, newState, _) =>
-            oldState === emptyState &&
-            newState.isInstanceOf[State.EarlyFailed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(emptyState, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(emptyState, bankAccountApplication)
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val sourceAccountNo                               = AccountNo("account")
@@ -313,24 +310,17 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.remittanceAmount === remittanceAmount)
         }
 
+        selfProbe.expectMessage(remitCommand)
+        selfProbe.expectMessage(CompleteTransaction)
+
       }
 
       "reject a Remit command with a negative remittance amount, persist a InvalidRemittanceRequested event, and then move to a EarlyFailed state" in {
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, emptyState)
-        (callbacks.onInvalidRemitRequested _)
-          .expects(where { (_, oldState, newState, _) =>
-            oldState === emptyState &&
-            newState.isInstanceOf[State.EarlyFailed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(emptyState, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(emptyState, bankAccountApplication)
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val sourceAccountNo                               = AccountNo("source")
@@ -353,6 +343,9 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.destinationAccountNo === destinationAccountNo)
           expect(state.remittanceAmount === remittanceAmount)
         }
+
+        selfProbe.expectMessage(remitCommand)
+        selfProbe.expectMessage(CompleteTransaction)
 
       }
 
@@ -411,19 +404,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(WithdrawalResult.Succeeded(sourceBalanceAfterWithdrawal)))
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .returns(())
-        (callbacks.onWithdrawSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === withdrawingFromSource &&
-            newState.isInstanceOf[State.DepositingToDestination]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(withdrawingFromSource, bankAccountApplication)
 
         orchestrator ! WithdrawFromSource
 
@@ -443,6 +425,8 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.refundTransactionId === refundTransactionId)
         }
 
+        selfProbe.expectMessage(DepositToDestination)
+
       }
 
       "fail to withdraw the remittance amount from the source account due to ShortBalance, persist a BalanceShorted event, and then move to a Failed state" in {
@@ -453,19 +437,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(WithdrawalResult.ShortBalance))
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .returns(())
-        (callbacks.onWithdrawFailed _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === withdrawingFromSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(withdrawingFromSource, bankAccountApplication)
 
         orchestrator ! WithdrawFromSource
 
@@ -486,6 +459,8 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.failureReply === ShortBalance)
         }
 
+        selfProbe.expectMessage(CompleteTransaction)
+
       }
 
       "retry withdrawal several times due to a timeout, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
@@ -503,19 +478,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall { _ => newWithdrawalResult() }
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .returns(())
-        (callbacks.onWithdrawSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === withdrawingFromSource &&
-            newState.isInstanceOf[State.DepositingToDestination]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(withdrawingFromSource, bankAccountApplication)
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
@@ -542,6 +506,8 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.refundTransactionId === refundTransactionId)
             }
 
+            selfProbe.expectMessage(DepositToDestination)
+
           }
 
       }
@@ -563,19 +529,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newWithdrawalResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .returns(())
-        (callbacks.onWithdrawSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === withdrawingFromSource &&
-            newState.isInstanceOf[State.DepositingToDestination]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(withdrawingFromSource, bankAccountApplication)
 
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
@@ -602,37 +557,9 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.refundTransactionId === refundTransactionId)
             }
 
+            selfProbe.expectMessage(DepositToDestination)
+
           }
-
-      }
-
-      "resume the withdrawal automatically when it is recovered" in {
-
-        val bankAccountApplication = mock[BankAccountApplication]
-        (bankAccountApplication
-          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
-          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .returns(Future.successful(WithdrawalResult.Succeeded(100)))
-
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .onCall(Context.DefaultCallbacks.onRecoveryCompleted _) // Should delegate to the DefaultCallbacks.
-        (callbacks.onWithdrawSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === withdrawingFromSource &&
-            newState.isInstanceOf[State.DepositingToDestination]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-
-        // Don't send WithdrawFromSource to the orchestrator.
-        // The orchestrator resumes the withdrawal automatically.
-
-        persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
-        expectStateEventually[State.DepositingToDestination](orchestrator)
 
       }
 
@@ -682,7 +609,7 @@ final class RemittanceOrchestratorBehaviorSpec
       "succeed to deposit the remittance amount to the destination account, persist a DepositSucceeded event, and then move to a Succeeded state" in {
 
         val bankAccountApplication = mock[BankAccountApplication]
-        // It does not matter this value if this value is greater than or equal to the remittance amount (the eposit amount);
+        // It does not matter this value if this value is greater than or equal to the remittance amount (the deposit amount);
         // It would be great that this value is not equal to the deposit amount.
         val destinationBalanceAfterDeposit = remittanceAmount + 50
         (bankAccountApplication
@@ -690,19 +617,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(DepositResult.Succeeded(destinationBalanceAfterDeposit)))
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .returns(())
-        (callbacks.onDepositSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === depositingToDestination &&
-            newState.isInstanceOf[State.Succeeded]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(depositingToDestination, bankAccountApplication)
 
         orchestrator ! DepositToDestination
 
@@ -722,6 +638,8 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.refundTransactionId === refundTransactionId)
         }
 
+        selfProbe.expectMessage(CompleteTransaction)
+
       }
 
       "fail to deposit the remittance amount to the destination account due to ExcessBalance, persist a ExcessBalance event, and then move to a RefundingToSource state" in {
@@ -732,19 +650,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(DepositResult.ExcessBalance))
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .returns(())
-        (callbacks.onDepositFailed _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === depositingToDestination &&
-            newState.isInstanceOf[State.RefundingToSource]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(depositingToDestination, bankAccountApplication)
 
         orchestrator ! DepositToDestination
 
@@ -765,6 +672,8 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.refundReason === State.RefundingToSource.RefundReason.BalanceExceeded)
         }
 
+        selfProbe.expectMessage(RefundToSource)
+
       }
 
       "retry deposit several times due to a timeout, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
@@ -782,19 +691,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newDepositResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .returns(())
-        (callbacks.onDepositSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === depositingToDestination &&
-            newState.isInstanceOf[State.Succeeded]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(depositingToDestination, bankAccountApplication)
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
@@ -821,6 +719,8 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.refundTransactionId === refundTransactionId)
             }
 
+            selfProbe.expectMessage(CompleteTransaction)
+
           }
 
       }
@@ -842,19 +742,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newDepositResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .returns(())
-        (callbacks.onDepositSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === depositingToDestination &&
-            newState.isInstanceOf[State.Succeeded]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(depositingToDestination, bankAccountApplication)
 
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
@@ -881,37 +770,9 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.refundTransactionId === refundTransactionId)
             }
 
+            selfProbe.expectMessage(CompleteTransaction)
+
           }
-
-      }
-
-      "resume the deposit automatically when it is recovered" in {
-
-        val bankAccountApplication = mock[BankAccountApplication]
-        (bankAccountApplication
-          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
-          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
-          .returns(Future.successful(DepositResult.Succeeded(100)))
-
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .onCall(Context.DefaultCallbacks.onRecoveryCompleted _) // Should delegate to the DefaultCallbacks.
-        (callbacks.onDepositSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === depositingToDestination &&
-            newState.isInstanceOf[State.Succeeded]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-
-        // Don't send DepositToDestination to the orchestrator.
-        // The orchestrator resumes the deposit automatically.
-
-        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
-        expectStateEventually[State.Succeeded](orchestrator)
 
       }
 
@@ -971,19 +832,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(RefundResult.Succeeded(sourceBalanceAfterRefund)))
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .returns(())
-        (callbacks.onRefundSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === refundingToSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(refundingToSource, bankAccountApplication)
 
         orchestrator ! RefundToSource
 
@@ -1005,6 +855,8 @@ final class RemittanceOrchestratorBehaviorSpec
           expect(state.failureReply === ExcessBalance)
         }
 
+        selfProbe.expectMessage(CompleteTransaction)
+
       }
 
       "retry refund several times due to a timeout, succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
@@ -1022,19 +874,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newRefundResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .returns(())
-        (callbacks.onRefundSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === refundingToSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(refundingToSource, bankAccountApplication)
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
@@ -1063,6 +904,8 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.failureReply === ExcessBalance)
             }
 
+            selfProbe.expectMessage(CompleteTransaction)
+
           }
 
       }
@@ -1084,19 +927,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newRefundResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .returns(())
-        (callbacks.onRefundSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === refundingToSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(refundingToSource, bankAccountApplication)
 
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
@@ -1125,6 +957,8 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.failureReply === ExcessBalance)
             }
 
+            selfProbe.expectMessage(CompleteTransaction)
+
           }
 
       }
@@ -1146,19 +980,8 @@ final class RemittanceOrchestratorBehaviorSpec
           .repeat(failureLimit + 1)
           .onCall(_ => newRefundResult())
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .returns(())
-        (callbacks.onRefundSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === refundingToSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(refundingToSource, bankAccountApplication)
 
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
@@ -1187,37 +1010,9 @@ final class RemittanceOrchestratorBehaviorSpec
               expect(state.failureReply === ExcessBalance)
             }
 
+            selfProbe.expectMessage(CompleteTransaction)
+
           }
-
-      }
-
-      "resume the refund automatically when it is recovered" in {
-
-        val bankAccountApplication = mock[BankAccountApplication]
-        (bankAccountApplication
-          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
-          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .returns(Future.successful(RefundResult.Succeeded(100)))
-
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .onCall(Context.DefaultCallbacks.onRecoveryCompleted _) // Should delegate to the DefaultCallbacks.
-        (callbacks.onRefundSucceeded _)
-          .expects(where { (_, oldState, newState) =>
-            oldState === refundingToSource &&
-            newState.isInstanceOf[State.Failed]
-          }).returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-
-        // Don't send RefundToSource to the orchestrator.
-        // The orchestrator resumes the refund automatically.
-
-        persistenceTestKit.expectNextPersistedType[RefundSucceeded](persistenceId.id)
-        expectStateEventually[State.Failed](orchestrator)
 
       }
 
@@ -1267,15 +1062,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, succeeded)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(succeeded, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(succeeded, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
@@ -1288,15 +1077,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, succeeded)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(succeeded, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(succeeded, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentSourceAccountNo =
@@ -1311,15 +1094,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, succeeded)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(succeeded, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(succeeded, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentDestinationAccountNo =
@@ -1334,15 +1111,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, succeeded)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(succeeded, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(succeeded, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentRemittanceAmount =
@@ -1406,15 +1177,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, failed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(failed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(failed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
@@ -1429,15 +1194,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, failed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(failed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(failed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
@@ -1452,15 +1211,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, failed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(failed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(failed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentSourceAccountNo =
@@ -1477,15 +1230,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, failed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(failed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(failed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentDestinationAccountNo =
@@ -1502,15 +1249,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, failed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(failed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(failed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remitWithDifferentRemittanceAmount =
@@ -1566,15 +1307,9 @@ final class RemittanceOrchestratorBehaviorSpec
 
         val bankAccountApplication = mock[BankAccountApplication]
 
-        val callbacks = mock[Context.Callbacks]
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, earlyFailed)
-          .returns(())
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(earlyFailed, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-        val replyProbe   = testKit.createTestProbe[RemitReply]()
+        val (orchestrator, persistenceId, _) =
+          spawnWithSelfProbe(earlyFailed, bankAccountApplication)
+        val replyProbe = testKit.createTestProbe[RemitReply]()
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val remit =
@@ -1750,7 +1485,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
-      "resume at a WithdrawingFromSource, process commands, and then replies a RemitSucceeded" in {
+      "resume the withdrawal automatically when it is recovered" in {
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val sourceAccountNo                               = AccountNo("source")
@@ -1778,87 +1513,19 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
 
-        val callbacks = mock[Context.Callbacks]
-        // Only onRecoveryCompleted, we should not delegate to the DefaultCallbacks.
-        // We will manually emit a WithdrawalFromSource command in this test.
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, withdrawingFromSource)
-          .returns(())
-        (callbacks.onWithdrawSucceeded _)
-          .expects(*, withdrawingFromSource, *)
-          .onCall(Context.DefaultCallbacks.onWithdrawSucceeded _)
-        (callbacks.onDepositSucceeded _)
-          .expects(*, *, *)
-          .onCall(Context.DefaultCallbacks.onDepositSucceeded _)
+        val (persistenceId, orchestratorBehavior) = createBehavior(withdrawingFromSource, bankAccountApplication)
+        val orchestrator                          = spawn(orchestratorBehavior)
 
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(withdrawingFromSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        // Do not emit the WithdrawFromSource.
+        // The orchestrator's recovery process will emit the command.
 
-        // We emulate the orchestrator receiving a Remit command in a WithdrawingFromSource by emitting the command manually.
-        // And then, we emulate the orchestrator recovery by emitting a WithdrawFromSource command.
-        val replyProbe = testKit.createTestProbe[RemitReply]()
-        orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
-        orchestrator ! WithdrawFromSource
-
-        replyProbe.expectMessage(RemitSucceeded)
         persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
         persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
         expectStateEventually[State.Succeeded](orchestrator)
 
       }
 
-      "resume at a DepositingToDestination, process commands, and then replies a RemitSucceeded" in {
-
-        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
-        val sourceAccountNo                               = AccountNo("source")
-        val destinationAccountNo                          = AccountNo("destination")
-        val remittanceAmount                              = BigInt(100)
-        val withdrawalTransactionId                       = Context.DefaultTransactionIdFactory.generate()
-        val depositTransactionId                          = Context.DefaultTransactionIdFactory.generate()
-        val refundTransactionId                           = Context.DefaultTransactionIdFactory.generate()
-        val depositingToDestination = State.DepositingToDestination(
-          sourceAccountNo,
-          destinationAccountNo,
-          remittanceAmount,
-          withdrawalTransactionId,
-          depositTransactionId,
-          refundTransactionId,
-        )
-
-        val bankAccountApplication = mock[BankAccountApplication]
-        (bankAccountApplication
-          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
-          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
-          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
-
-        val callbacks = mock[Context.Callbacks]
-        // Only onRecoveryCompleted, we should not delegate to the DefaultCallbacks.
-        // We will manually emit a DepositToDestination command in this test.
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, depositingToDestination)
-          .returns(())
-        (callbacks.onDepositSucceeded _)
-          .expects(*, *, *)
-          .onCall(Context.DefaultCallbacks.onDepositSucceeded _)
-
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(depositingToDestination, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
-
-        // We emulate the orchestrator receiving a Remit command in a DepositingToDestination by emitting the command manually.
-        // And then, we emulate the orchestrator recovery by emitting a DepositToDestination command.
-        val replyProbe = testKit.createTestProbe[RemitReply]()
-        orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
-        orchestrator ! DepositToDestination
-
-        replyProbe.expectMessage(RemitSucceeded)
-        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
-        expectStateEventually[State.Succeeded](orchestrator)
-
-      }
-
-      "resume at a RefundingToSource, process commands, and then replies a ExcessBalance" in {
+      "resume the depositing automatically when it is recovered" in {
 
         implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
         val sourceAccountNo                               = AccountNo("source")
@@ -1883,25 +1550,180 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
           .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
 
-        val callbacks = mock[Context.Callbacks]
-        // Only onRecoveryCompleted, we should not delegate to the DefaultCallbacks.
-        // We will manually emit a RefundToSource command in this test.
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, refundingToSource)
-          .returns(())
-        (callbacks.onRefundSucceeded _)
-          .expects(*, *, *)
-          .onCall(Context.DefaultCallbacks.onRefundSucceeded _)
+        val (persistenceId, orchestratorBehavior) = createBehavior(refundingToSource, bankAccountApplication)
+        val orchestrator                          = spawn(orchestratorBehavior)
 
-        val (persistenceId, orchestratorBehavior) =
-          createBehavior(refundingToSource, bankAccountApplication, callbacks = callbacks)
-        val orchestrator = spawn(orchestratorBehavior)
+        // Do not emit the RefundToSource.
+        // The orchestrator's recovery process will emit the command.
+
+        persistenceTestKit.expectNextPersistedType[RefundSucceeded](persistenceId.id)
+        expectStateEventually[State.Failed](orchestrator)
+
+      }
+
+      "resume the deposit automatically when it is recovered" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+        val withdrawalTransactionId                       = Context.DefaultTransactionIdFactory.generate()
+        val depositTransactionId                          = Context.DefaultTransactionIdFactory.generate()
+        val refundTransactionId                           = Context.DefaultTransactionIdFactory.generate()
+        val depositingToDestination = State.DepositingToDestination(
+          sourceAccountNo,
+          destinationAccountNo,
+          remittanceAmount,
+          withdrawalTransactionId,
+          depositTransactionId,
+          refundTransactionId,
+        )
+
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
+
+        val (persistenceId, orchestratorBehavior) = createBehavior(depositingToDestination, bankAccountApplication)
+        val orchestrator                          = spawn(orchestratorBehavior)
+
+        // Do not emit the DepositToDestination.
+        // The orchestrator's recovery process will emit the command.
+
+        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
+        expectStateEventually[State.Succeeded](orchestrator)
+
+      }
+
+      "stash a Remit command at a WithdrawingFromSource, process internal commands, and then respond to the Remit command" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+        val withdrawalTransactionId                       = Context.DefaultTransactionIdFactory.generate()
+        val depositTransactionId                          = Context.DefaultTransactionIdFactory.generate()
+        val refundTransactionId                           = Context.DefaultTransactionIdFactory.generate()
+        val withdrawingFromSource = State.WithdrawingFromSource(
+          sourceAccountNo,
+          destinationAccountNo,
+          remittanceAmount,
+          withdrawalTransactionId,
+          depositTransactionId,
+          refundTransactionId,
+        )
+
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(WithdrawalResult.Succeeded(0)))
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(withdrawingFromSource, bankAccountApplication)
+
+        // We emulate the orchestrator receiving a Remit command in a WithdrawingFromSource by emitting the command manually.
+        // And then, we emulate the orchestrator's internal command processing.
+        val replyProbe = testKit.createTestProbe[RemitReply]()
+        orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
+        orchestrator ! WithdrawFromSource
+
+        selfProbe.expectMessage(DepositToDestination)
+        orchestrator ! DepositToDestination
+
+        selfProbe.expectMessage(CompleteTransaction)
+        orchestrator ! CompleteTransaction
+
+        replyProbe.expectMessage(RemitSucceeded)
+        persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
+        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
+        expectStateEventually[State.Succeeded](orchestrator)
+
+      }
+
+      "stash a Remit command at a DepositingToDestination, process internal commands, and then respond to the Remit command" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+        val withdrawalTransactionId                       = Context.DefaultTransactionIdFactory.generate()
+        val depositTransactionId                          = Context.DefaultTransactionIdFactory.generate()
+        val refundTransactionId                           = Context.DefaultTransactionIdFactory.generate()
+        val depositingToDestination = State.DepositingToDestination(
+          sourceAccountNo,
+          destinationAccountNo,
+          remittanceAmount,
+          withdrawalTransactionId,
+          depositTransactionId,
+          refundTransactionId,
+        )
+
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(depositingToDestination, bankAccountApplication)
+
+        // We emulate the orchestrator receiving a Remit command in a DepositingToDestination by emitting the command manually.
+        // And then, we emulate we emulate the orchestrator's internal command processing.
+        val replyProbe = testKit.createTestProbe[RemitReply]()
+        orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
+        orchestrator ! DepositToDestination
+
+        selfProbe.expectMessage(CompleteTransaction)
+        orchestrator ! CompleteTransaction
+
+        replyProbe.expectMessage(RemitSucceeded)
+        persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
+        expectStateEventually[State.Succeeded](orchestrator)
+
+      }
+
+      "stash a Remit command at a RefundingToSource, process internal commands, and then respond to the Remit command" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+        val withdrawalTransactionId                       = Context.DefaultTransactionIdFactory.generate()
+        val depositTransactionId                          = Context.DefaultTransactionIdFactory.generate()
+        val refundTransactionId                           = Context.DefaultTransactionIdFactory.generate()
+        val refundingToSource = State.RefundingToSource(
+          sourceAccountNo,
+          destinationAccountNo,
+          remittanceAmount,
+          withdrawalTransactionId,
+          depositTransactionId,
+          refundTransactionId,
+          State.RefundingToSource.RefundReason.BalanceExceeded,
+        )
+
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          spawnWithSelfProbe(refundingToSource, bankAccountApplication)
 
         // We emulate the orchestrator receiving a Remit command in a RefundingToSource by emitting the command manually.
-        // And then, we emulate the orchestrator recovery by emitting a RefundToSource command.
+        // And then, we emulate we emulate the orchestrator's internal command processing.
         val replyProbe = testKit.createTestProbe[RemitReply]()
         orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
         orchestrator ! RefundToSource
+
+        selfProbe.expectMessage(CompleteTransaction)
+        orchestrator ! CompleteTransaction
 
         replyProbe.expectMessage(ExcessBalance)
         persistenceTestKit.expectNextPersistedType[RefundSucceeded](persistenceId.id)
@@ -1929,32 +1751,27 @@ final class RemittanceOrchestratorBehaviorSpec
           .expects(destinationAccountNo, *, remittanceAmount, appRequestContext)
           .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
 
-        val callbacks = mock[Context.Callbacks]
-        // onRecoveryCompleted will be called twice
-        // since the orchestrator restarts due to a journal failure.
-        (callbacks.onRecoveryCompleted _)
-          .expects(*, *)
-          .twice()
-          .onCall(Context.DefaultCallbacks.onRecoveryCompleted _)
-        (callbacks.onTransactionCreated _)
-          .expects(*, *, *, *)
-          .onCall { (context, oldState, newState, remitCommand) =>
-            // Once the orchestrator persist a transaction,
-            // the orchestrator will resume its behavior even if a journal failure occurs.
-            // This test emulate that the first WithdrawalSucceeded persisting will fail and then the second one will succeed.
-            persistenceTestKit.failNextPersisted()
-            Context.DefaultCallbacks.onTransactionCreated(context, oldState, newState, remitCommand)
-          }
-        (callbacks.onWithdrawSucceeded _)
-          .expects(*, *, *)
-          .onCall(Context.DefaultCallbacks.onWithdrawSucceeded _)
-        (callbacks.onDepositSucceeded _)
-          .expects(*, *, *)
-          .onCall(Context.DefaultCallbacks.onDepositSucceeded _)
-
         val (persistenceId, orchestratorBehavior) =
-          createBehavior(State.Empty(tenant), bankAccountApplication, callbacks = callbacks)
+          createBehavior(State.Empty(tenant), bankAccountApplication)
         val orchestrator = spawn(orchestratorBehavior)
+
+        // Emulate a journal failure
+        object SecondOperationFailurePolicy extends EventStorage.JournalPolicies.PolicyType {
+          @SuppressWarnings(Array("org.wartremover.warts.Var"))
+          private var count = 0
+          final class CustomFailure extends RuntimeException
+          override def tryProcess(persistenceId: String, processingUnit: JournalOperation): ProcessingResult = {
+            count += 1
+            if (count === 2) {
+              // The second journal operation will fail.
+              // This operation is the write operation of the first withdrawal result.
+              StorageFailure(new CustomFailure())
+            } else {
+              ProcessingSuccess
+            }
+          }
+        }
+        persistenceTestKit.withPolicy(SecondOperationFailurePolicy)
 
         val replyProbe = testKit.createTestProbe[RemitReply]()
         orchestrator ! Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)

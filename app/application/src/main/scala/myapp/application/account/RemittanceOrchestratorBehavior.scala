@@ -108,7 +108,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   ): Entity[Command, ShardingEnvelope[Command]] = {
     val initialState         = State.Empty(tenant)
     val transactionIdFactory = Context.DefaultTransactionIdFactory
-    val contextFactory       = Context.DefaultCallbacks
     Entity(typeKey(tenant))(context => {
       val entityId      = EntityId(context.entityId)
       val persistenceId = PersistenceId(context.entityTypeKey.name, entityId.value)
@@ -118,23 +117,28 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
         settings,
         bankAccountApplication,
         context.shard,
+        self = None,
         initialState,
         transactionIdFactory,
-        contextFactory,
       )
     }).withStopMessage(Stop)
   }
 
-  // This method is public since it is helpful for unit testing.
+  /** Creates RemittanceOrchestratorBehavior
+    *
+    * This method is public since it is helpful for unit testing.
+    *
+    * If we prefer to use the actor's actual ActorRef, pass None to `self`.
+    */
   def apply(
       entityId: EntityId,
       persistenceId: PersistenceId,
       settings: Settings,
       bankAccountApplication: BankAccountApplication,
       shard: ActorRef[ClusterSharding.ShardCommand],
+      self: Option[ActorRef[Command]],
       initialState: State,
       transactionIdFactory: Context.TransactionIdFactory,
-      callbacks: Context.Callbacks,
   ): Behavior[Command] = withLogger { logger =>
     Behaviors.setup { actorContext =>
       actorContext.setLoggerName(RemittanceOrchestratorBehavior.getClass)
@@ -145,10 +149,10 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             bankAccountApplication,
             shard,
             actorContext,
+            self.getOrElse(actorContext.self),
             timers,
             logger,
             transactionIdFactory,
-            callbacks,
           )
         EventSourcedBehavior[Command, DomainEvent, State](
           persistenceId,
@@ -372,15 +376,30 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       val appRequestContext: AppRequestContext,
   ) extends DepositingStateDomainEvent
 
+  /** Represents the context of this actor
+    *
+    * @param shard [[ActorRef]] of the shard of this entity(actor).
+    *              We can mock this instance for unit tests.
+    * @param actorContext The [[ActorContext]] instance of this actor.
+    *                     We can use some helpful methods of this instance, such as `pipeToSelf`.
+    *                     Be careful that we should not use `actorContext.self`.
+    *                     Use `self` of [[Context]] directly.
+    * @param self The [[ActorRef]] instance of this actor.
+    *             Use this parameter instead of `actorContext.self`.
+    *             Since we can mock this parameter,
+    *             unit tests could be relatively easy.
+    * @param transactionIdFactory A factory generating unique [[TransactionId]]s.
+    *                             We can mock this instance for unit tests.
+    */
   final case class Context(
       settings: Settings,
       bankAccountApplication: BankAccountApplication,
       shard: ActorRef[ClusterSharding.ShardCommand],
       actorContext: ActorContext[Command],
+      self: ActorRef[Command],
       timers: TimerScheduler[Command],
       logger: AppLogger,
       transactionIdFactory: Context.TransactionIdFactory,
-      callbacks: Context.Callbacks,
   ) {
     def logEvent(newState: State, oldState: State, event: DomainEvent)(implicit ctx: AppRequestContext): Unit = {
       logInfo(newState, s"oldState=${oldState.toString} event=${event.toString}")
@@ -431,90 +450,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       }
     }
 
-    /** Callbacks
-      *
-      * The callbacks are made for easy unit testing.
-      * It is not intended to extend behaviors.
-      * Keep in mind that we have to keep the implementation simple as possible.
-      */
-    trait Callbacks {
-      def onRecoveryCompleted(context: Context, state: State): Unit
-      def onTransactionCreated(context: Context, oldState: State.Empty, newState: State, remitCommand: Remit): Unit
-      def onInvalidRemitRequested(context: Context, oldState: State.Empty, newState: State, remitCommand: Remit): Unit
-      def onWithdrawSucceeded(context: Context, oldState: State.WithdrawingFromSource, newState: State): Unit
-      def onWithdrawFailed(context: Context, oldState: State.WithdrawingFromSource, newState: State): Unit
-      def onDepositSucceeded(context: Context, oldState: State.DepositingToDestination, newState: State): Unit
-      def onDepositFailed(context: Context, oldState: State.DepositingToDestination, newState: State): Unit
-      def onRefundSucceeded(context: Context, oldState: State.RefundingToSource, newState: State): Unit
-    }
-    object DefaultCallbacks extends Callbacks {
-      override def onRecoveryCompleted(context: Context, state: State): Unit = {
-        state match {
-          case _: State.Empty =>
-          // Do nothing
-          case _: State.WithdrawingFromSource =>
-            context.actorContext.self ! WithdrawFromSource
-          case _: State.DepositingToDestination =>
-            context.actorContext.self ! DepositToDestination
-          case _: State.RefundingToSource =>
-            context.actorContext.self ! RefundToSource
-          case _: State.Succeeded | _: State.Failed | _: State.EarlyFailed =>
-            val passivateTimeout = context.settings.passivateTimeout
-            context.actorContext.setReceiveTimeout(passivateTimeout, Passivate)
-        }
-      }
-      override def onTransactionCreated(
-          context: Context,
-          oldState: State.Empty,
-          newState: State,
-          remitCommand: Remit,
-      ): Unit = {
-        // The Remit command will be stashed, and then a withdrawal will be in progress.
-        //
-        // The sending order might be crucial.
-        // Stashed commands are preserved and processed later in case of a failure while storing events.
-        // Be careful that we should use onPersistentFailure with a backoff supervisor strategy.
-        // See https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#stash
-        //
-        context.actorContext.self ! remitCommand
-        context.actorContext.self ! WithdrawFromSource
-      }
-      override def onInvalidRemitRequested(
-          context: Context,
-          oldState: State.Empty,
-          newState: State,
-          remitCommand: Remit,
-      ): Unit = {
-        // The Remit command should be processed after this callback.
-        context.actorContext.self ! remitCommand
-        // Though Sending a CompleteTransaction might not be needed here,
-        // it is great for ensuring that all stashed commands will be un-stashed by sending the command.
-        context.actorContext.self ! CompleteTransaction
-      }
-      override def onWithdrawSucceeded(
-          context: Context,
-          oldState: State.WithdrawingFromSource,
-          newState: State,
-      ): Unit = {
-        context.actorContext.self ! DepositToDestination
-      }
-      override def onWithdrawFailed(context: Context, oldState: State.WithdrawingFromSource, newState: State): Unit = {
-        context.actorContext.self ! CompleteTransaction
-      }
-      override def onDepositSucceeded(
-          context: Context,
-          oldState: State.DepositingToDestination,
-          newState: State,
-      ): Unit = {
-        context.actorContext.self ! CompleteTransaction
-      }
-      override def onDepositFailed(context: Context, oldState: State.DepositingToDestination, newState: State): Unit = {
-        context.actorContext.self ! RefundToSource
-      }
-      override def onRefundSucceeded(context: Context, oldState: State.RefundingToSource, newState: State): Unit = {
-        context.actorContext.self ! CompleteTransaction
-      }
-    }
   }
 
   /** TimerKeys used for retries */
@@ -528,13 +463,11 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
 
   sealed trait State {
 
+    def recoveryCompleted(context: Context): Unit
+
     def applyCommand(context: Context, command: Command): Effect
 
     def applyEvent(context: Context, event: DomainEvent): State
-
-    def recoveryCompleted(context: Context): Unit = {
-      context.callbacks.onRecoveryCompleted(context, this)
-    }
 
     def ignoreUnexpectedCommand(context: Context, command: Command)(implicit ctx: AppRequestContext): Effect = {
       Effect.unhandled.thenRun { _ =>
@@ -558,6 +491,10 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   object State {
 
     final case class Empty(tenant: AppTenant) extends State {
+
+      override def recoveryCompleted(context: Context): Unit = {
+        // Do nothing
+      }
 
       override def applyCommand(context: Context, command: Command): Effect = {
         command match {
@@ -597,7 +534,16 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             .persist(transactionCreated)
             .thenRun { newState: State =>
               context.logEvent(newState, this, transactionCreated)(ctx)
-              context.callbacks.onTransactionCreated(context, this, newState, command)
+              //
+              // The Remit command will be stashed, and then a withdrawal will be in progress.
+              //
+              // The sending order might be crucial.
+              // Stashed commands are preserved and processed later in case of a failure while storing events.
+              // Be careful that we should use onPersistentFailure with a backoff supervisor strategy.
+              // See https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#stash
+              //
+              context.self ! command
+              context.self ! WithdrawFromSource
             }
         } else {
           val failed = InvalidRemittanceRequested(
@@ -609,7 +555,11 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             .persist(failed)
             .thenRun { newState =>
               context.logEvent(newState, this, failed)(ctx)
-              context.callbacks.onInvalidRemitRequested(context, this, newState, command)
+              // The Remit command should be processed after this callback.
+              context.self ! command
+              // Though Sending a CompleteTransaction might not be needed here,
+              // it is great for ensuring that all stashed commands will be un-stashed by sending the command.
+              context.self ! CompleteTransaction
             }
         }
       }
@@ -670,6 +620,10 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
         val appRequestContext: AppRequestContext,
     ) extends TransactionState {
 
+      override def recoveryCompleted(context: Context): Unit = {
+        context.self ! WithdrawFromSource
+      }
+
       override def applyCommand(context: Context, command: Command): Effect = {
         command match {
           case WithdrawFromSource =>
@@ -712,7 +666,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               .persist(withdrawalSucceeded)
               .thenRun { newState =>
                 context.logEvent(newState, this, withdrawalSucceeded)
-                context.callbacks.onWithdrawSucceeded(context, this, newState)
+                context.self ! DepositToDestination
               }
           case WithdrawalResult.ShortBalance =>
             val balanceShorted = BalanceShorted(
@@ -724,7 +678,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               .persist(balanceShorted)
               .thenRun { newState =>
                 context.logEvent(newState, this, balanceShorted)
-                context.callbacks.onWithdrawFailed(context, this, newState)
+                context.self ! CompleteTransaction
               }
           case WithdrawalResult.Timeout =>
             Effect.none.thenRun { state: State =>
@@ -796,6 +750,10 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
         val appRequestContext: AppRequestContext,
     ) extends TransactionState {
 
+      override def recoveryCompleted(context: Context): Unit = {
+        context.self ! DepositToDestination
+      }
+
       override def applyCommand(context: Context, command: Command): Effect = {
         command match {
           case DepositToDestination =>
@@ -839,7 +797,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               .persist(depositSucceeded)
               .thenRun { newState =>
                 context.logEvent(newState, this, depositSucceeded)
-                context.callbacks.onDepositSucceeded(context, this, newState)
+                context.self ! CompleteTransaction
               }
           case DepositResult.ExcessBalance =>
             val balanceExceeded = BalanceExceeded(
@@ -851,7 +809,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               .persist(balanceExceeded)
               .thenRun { newState =>
                 context.logEvent(newState, this, balanceExceeded)
-                context.callbacks.onDepositFailed(context, this, newState)
+                context.self ! RefundToSource
               }
           case DepositResult.Timeout =>
             Effect.none.thenRun { state: State =>
@@ -932,6 +890,10 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
 
       import RefundingToSource._
 
+      override def recoveryCompleted(context: Context): Unit = {
+        context.self ! RefundToSource
+      }
+
       override def applyCommand(context: Context, command: Command): Effect = command match {
         case RefundToSource =>
           applyRefundToSource(context)
@@ -981,7 +943,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               .persist(refunded)
               .thenRun { newState =>
                 context.logEvent(newState, this, refunded)
-                context.callbacks.onRefundSucceeded(context, this, newState)
+                context.self ! CompleteTransaction
               }
 
           case RefundResult.InvalidArgument =>
@@ -1053,11 +1015,18 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
     }
 
     sealed trait TransactionCompletedState extends TransactionState {
+
+      override def recoveryCompleted(context: Context): Unit = {
+        val passivateTimeout = context.settings.passivateTimeout
+        context.actorContext.setReceiveTimeout(passivateTimeout, Passivate)
+      }
+
       def applyPassivate(context: Context): Effect = {
         Effect.none.thenRun { _: State =>
           context.shard ! ClusterSharding.Passivate(context.actorContext.self)
         }
       }
+
     }
 
     final case class Succeeded(
