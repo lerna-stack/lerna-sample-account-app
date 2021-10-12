@@ -47,7 +47,7 @@ final class RemittanceApplicationImpl(
     *
     * これらの仕様は設定ファイルによって変更されるべきではないため、プログラマブルに設定を行う。
     *
-    * @see [[https://doc.akka.io/docs/akka/current/typed/cluster-sharding.html#remembering-entities Remembering Entities]]
+    * @see [[https://doc.akka.io/docs/akka/2.6.12/typed/cluster-sharding.html#remembering-entities Remembering Entities]]
     */
   private def clusterShardingSettingsFor(tenant: AppTenant): ClusterShardingSettings = {
     ClusterShardingSettings(system)

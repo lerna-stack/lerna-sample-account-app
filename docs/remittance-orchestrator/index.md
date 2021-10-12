@@ -18,10 +18,10 @@ Saga 分散トランザクション の詳細は、
 送金取引を扱うオーケストレータを送金オーケストレータと呼ぶこととします。
 送金オーケストレータは、送金取引ごとに作成され、送金取引が完了するまで動作し続けます。
 送金オーケストレータは、
-[Cluster Sharding • Akka Documentation](https://doc.akka.io/docs/akka/current/typed/cluster-sharding.html)
+[Cluster Sharding • Akka Documentation](https://doc.akka.io/docs/akka/2.6.12/typed/cluster-sharding.html)
 の Entity として動作します。
 送金オーケストレータの動作は、
-[Event Sourcing • Akka Documentation](https://doc.akka.io/docs/akka/current/typed/persistence.html)
+[Event Sourcing • Akka Documentation](https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html)
 を用いて実装されています。
 
 

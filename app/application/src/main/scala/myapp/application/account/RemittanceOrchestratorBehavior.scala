@@ -35,8 +35,8 @@ import scala.util.{ Failure, Success }
   * 送金オーケストレータは、送金完了時(成功失敗問わず)にレスポンスを返す。
   * 送金が完了するまでの間、受信した 送金コマンド [[RemittanceOrchestratorBehavior.Remit]] は内部バッファに stash される。
   *
-  * Akka Actor の [[https://doc.akka.io/docs/akka/current/typed/stash.html#stash Stash]] ではなく、
-  * Akka Persistence の [[https://doc.akka.io/docs/akka/current/typed/persistence.html#stash Stash]] が使用されることに注意すること。
+  * Akka Actor の [[https://doc.akka.io/docs/akka/2.6.12/typed/stash.html#stash Stash]] ではなく、
+  * Akka Persistence の [[https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#stash Stash]] が使用されることに注意すること。
   * Akka Persistence の Stash を使用することで Journal Failure 等が発生したときに、stash されているコマンドのドロップを防止できる。
   *
   * Akka Persistence の Stash Buffer は、 EventSourcedBehavior の内部動作用(internal)と `Effect.stash`用(user)で分離されており、
@@ -166,8 +166,8 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             // This might be helpful even if we use Akka Cluster Sharding Remember Entities
             // since stashed commands are preserved when persistence failure occurs.
             // See:
-            //  - https://doc.akka.io/docs/akka/current/typed/persistence.html#journal-failures
-            //  - https://doc.akka.io/docs/akka/current/typed/persistence.html#journal-failures
+            //  - https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#journal-failures
+            //  - https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#stash
             SupervisorStrategy.restartWithBackoff(
               settings.persistenceFailureRestartMinBackOff,
               settings.persistenceFailureRestartMaxBackOff,
@@ -474,7 +474,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
         // The sending order might be crucial.
         // Stashed commands are preserved and processed later in case of a failure while storing events.
         // Be careful that we should use onPersistentFailure with a backoff supervisor strategy.
-        // See https://doc.akka.io/docs/akka/current/typed/persistence.html#stash
+        // See https://doc.akka.io/docs/akka/2.6.12/typed/persistence.html#stash
         //
         context.actorContext.self ! remitCommand
         context.actorContext.self ! WithdrawFromSource
