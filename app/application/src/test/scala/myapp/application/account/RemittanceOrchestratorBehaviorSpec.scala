@@ -87,7 +87,7 @@ object RemittanceOrchestratorBehaviorSpec {
 
 }
 
-@SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf", "org.wartremover.warts.Product"))
+@SuppressWarnings(Array("org.wartremover.warts.Product"))
 final class RemittanceOrchestratorBehaviorSpec
     extends ScalaTestWithTypedActorTestKit(RemittanceOrchestratorBehaviorSpec.config)
     with StandardSpec
