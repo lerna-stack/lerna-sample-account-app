@@ -89,6 +89,23 @@ object RemittanceOrchestratorBehaviorSpec {
 
 }
 
+/** Test [[RemittanceOrchestratorBehavior]]
+  *
+  * ==NOTES==
+  * We can write almost all test cases using [[EventSourcedBehaviorTestKit]] and a result of [[EventSourcedBehaviorTestKit.runCommand]].
+  * Some test cases are written with interesting techniques.
+  *
+  * If a command and a command handler meets the following conditions,
+  * we might not use a result of the `runCommand`.
+  *  - The command triggers an asynchronous task and redirects(pipes) its result to itself.
+  *  - The command has no reply. This means we cannot observe that command processing has finished.
+  *
+  * However, also in such situation, we can inspect the state and the persisted events.
+  * To inspect the persisted events, use [[EventSourcedBehaviorTestKit.persistenceTestKit]].
+  * To inspect the state, use [[EventSourcedBehaviorTestKit.getState]]
+  * Be careful that we have to wait for command processing to be finished.
+  * The waiting might be achieved by probing something emitted by the command handler.
+  */
 @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf", "org.wartremover.warts.Product"))
 final class RemittanceOrchestratorBehaviorSpec
     extends ScalaTestWithTypedActorTestKit(RemittanceOrchestratorBehaviorSpec.config)
