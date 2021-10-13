@@ -74,7 +74,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   /** [[RemittanceOrchestratorBehavior]] の設定
     *
     * @param journalPluginId イベント永続化PluginId
-    * @param snapshotPluginId スナップショット永続化PluginId
     * @param withdrawalRetryDelay 出金をリトライする際の遅延時間
     * @param depositRetryDelay 入金をリトライする際の遅延時間
     * @param refundRetryDelay 返金をリトライする際の遅延時間
@@ -86,7 +85,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
     */
   final case class Settings(
       journalPluginId: String,
-      snapshotPluginId: String,
       withdrawalRetryDelay: FiniteDuration,
       depositRetryDelay: FiniteDuration,
       refundRetryDelay: FiniteDuration,
@@ -179,7 +177,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             ),
           )
           .withJournalPluginId(settings.journalPluginId)
-          .withSnapshotPluginId(settings.snapshotPluginId)
       }
     }
   }

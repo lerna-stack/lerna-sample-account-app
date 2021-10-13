@@ -29,7 +29,6 @@ object RemittanceOrchestratorBehaviorSpec {
   private val config = {
     val appConfig = ConfigFactory.load("application-test")
     EventSourcedBehaviorTestKit.config
-      .withFallback(PersistenceTestKitSnapshotPlugin.config)
       .withFallback(appConfig)
   }
 
@@ -41,14 +40,13 @@ object RemittanceOrchestratorBehaviorSpec {
       // Since we cannot choose which commands should be verified by this flag,
       // we switch this flag off and verify commands' serialization manually.
       .withVerifyCommands(false)
-      // FIXME Some states are not serializable.
+      // Since snapshot is not used, all states do not have to be serializable.
       .withVerifyState(false)
   }
 
   private val settings: Settings = {
     Settings(
       journalPluginId = PersistenceTestKitPlugin.PluginId,
-      snapshotPluginId = PersistenceTestKitSnapshotPlugin.PluginId,
       withdrawalRetryDelay = 100.millis,
       depositRetryDelay = 100.millis,
       refundRetryDelay = 100.millis,

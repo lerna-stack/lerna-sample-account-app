@@ -64,7 +64,6 @@ final class RemittanceApplicationImpl(
   private def orchestratorBehaviorSettingsFor(tenant: AppTenant): RemittanceOrchestratorBehavior.Settings = {
     RemittanceOrchestratorBehavior.Settings(
       s"myapp.application.remittance-orchestrator.persistence-${tenant.id}.journal",
-      s"myapp.application.remittance-orchestrator.persistence-${tenant.id}.snapshot",
       withdrawalRetryDelay = 500.millis,
       depositRetryDelay = 500.millis,
       refundRetryDelay = 500.millis,
