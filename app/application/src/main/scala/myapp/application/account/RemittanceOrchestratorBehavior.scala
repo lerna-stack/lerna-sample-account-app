@@ -1,6 +1,5 @@
 package myapp.application.account
 
-import akka.actor.NoSerializationVerificationNeeded
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import akka.actor.typed.{ ActorRef, Behavior, SupervisorStrategy }
 import akka.cluster.sharding.typed.ShardingEnvelope
@@ -266,16 +265,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
     */
   case object Passivate extends TransactionCompletedStateCommand
 
-  /** コマンド:状態取得
-    *
-    * アクターの現在の状態を取得する。
-    * このコマンドはテストでのみ使用することを意図しており、テスト以外で使用しないこと。
-    * このコマンドはノード間で送信しないため、Serialize できる必要はない。
-    */
-  final case class InspectState(replyTo: ActorRef[InspectStateReply])
-      extends Command
-      with NoSerializationVerificationNeeded
-
   sealed trait Reply
 
   /** 送金結果 */
@@ -285,13 +274,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   case object InvalidArgument extends RemitFailed
   case object ShortBalance    extends RemitFailed
   case object ExcessBalance   extends RemitFailed
-
-  /** アクターの状態
-    *
-    * この返信はテストでのみ使用することを意図しており、テスト以外では使用しないこと。
-    * このコマンドはノード間で送信しないため、Serialize できる必要はない。
-    */
-  final case class InspectStateReply(state: State) extends Reply with NoSerializationVerificationNeeded
 
   sealed trait DomainEvent {
     def appRequestContext: AppRequestContext
@@ -482,10 +464,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
       throw new IllegalStateException(message)
     }
 
-    def applyInspectState(command: InspectState): Effect = {
-      Effect.none.thenReply(command.replyTo)(InspectStateReply)
-    }
-
   }
 
   object State {
@@ -502,8 +480,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             applyRemit(context, command)
           case Stop =>
             Effect.stop()
-          case command: InspectState =>
-            applyInspectState(command)
           case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand |
               _: TransactionCompletedStateCommand =>
             // Make and use an unknown context since this state is not bounded to any request.
@@ -636,8 +612,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             Effect.stash()
           case Stop =>
             Effect.stop()
-          case command: InspectState =>
-            applyInspectState(command)
           case _: DepositingStateCommand | _: RefundingStateCommand | _: TransactionCompletedStateCommand =>
             ignoreUnexpectedCommand(context, command)
         }
@@ -766,8 +740,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
             Effect.stash()
           case Stop =>
             Effect.stop()
-          case command: InspectState =>
-            applyInspectState(command)
           case _: WithdrawingStateCommand | _: RefundingStateCommand | _: TransactionCompletedStateCommand =>
             ignoreUnexpectedCommand(context, command)
         }
@@ -905,8 +877,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           Effect.stash()
         case Stop =>
           Effect.stop()
-        case command: InspectState =>
-          applyInspectState(command)
         case _: WithdrawingStateCommand | _: DepositingStateCommand | _: TransactionCompletedStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
@@ -1052,8 +1022,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           applyPassivate(context)
         case Stop =>
           Effect.stop()
-        case command: InspectState =>
-          applyInspectState(command)
         case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
@@ -1086,8 +1054,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           applyPassivate(context)
         case Stop =>
           Effect.stop()
-        case command: InspectState =>
-          applyInspectState(command)
         case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
@@ -1112,8 +1078,6 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
           applyPassivate(context)
         case Stop =>
           Effect.stop()
-        case command: InspectState =>
-          applyInspectState(command)
         case _: WithdrawingStateCommand | _: DepositingStateCommand | _: RefundingStateCommand =>
           ignoreUnexpectedCommand(context, command)
       }
