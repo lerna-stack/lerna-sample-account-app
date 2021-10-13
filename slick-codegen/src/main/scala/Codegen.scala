@@ -108,12 +108,11 @@ object Codegen extends App {
         }
       }
     }.map { codegen =>
-      codegen.writeToFile(
+      codegen.writeToMultipleFiles(
         config.getString("profile").replaceFirst("""\$$""", ""),
         config.getString("outputDir"),
         config.getString("pkg"),
         container = "Tables",
-        fileName = "Tables.scala",
       )
     }
   codegenFuture.onComplete {
