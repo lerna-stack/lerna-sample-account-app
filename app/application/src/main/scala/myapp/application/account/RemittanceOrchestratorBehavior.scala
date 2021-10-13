@@ -946,7 +946,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                   state,
                   s"Refund failed due to a timeout. This will retry refund again after ${delay.toString}.",
                 )
-                context.timers.startSingleTimer(TimerKeys.RetryDeposit, RefundToSource, delay)
+                context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }
         }
       }
@@ -966,7 +966,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                  |Tough we might have to recover this failure by human operations, this will retry refund again after ${delay.toString}.
                  |""".stripMargin
             context.logError(state, cause, message)
-            context.timers.startSingleTimer(TimerKeys.RetryDeposit, RefundToSource, delay)
+            context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
           }
       }
 
