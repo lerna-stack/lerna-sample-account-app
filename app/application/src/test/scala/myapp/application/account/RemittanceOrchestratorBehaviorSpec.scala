@@ -1,6 +1,6 @@
 package myapp.application.account
 
-import akka.actor.testkit.typed.scaladsl.{ LoggingTestKit, TestProbe }
+import akka.actor.testkit.typed.scaladsl.{ LoggingTestKit, SerializationTestKit, TestProbe }
 import akka.actor.typed.{ ActorRef, Behavior }
 import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import akka.persistence.testkit._
@@ -37,10 +37,12 @@ object RemittanceOrchestratorBehaviorSpec {
     SerializationSettings.enabled
       // Prefer to verify the equality of the result of the serialization.
       .withVerifyEquality(true)
+      // Some commands do not have to be serializable.
+      // Since we cannot choose which commands should be verified by this flag,
+      // we switch this flag off and verify commands' serialization manually.
+      .withVerifyCommands(false)
       // FIXME Some states are not serializable.
       .withVerifyState(false)
-      // FIXME Some commands are not serializable.
-      .withVerifyCommands(false)
   }
 
   private val settings: Settings = {
@@ -1830,6 +1832,30 @@ final class RemittanceOrchestratorBehaviorSpec
         orchestrator.persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
         orchestrator.persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
         expect(result.state.isInstanceOf[State.Succeeded])
+
+      }
+
+    }
+
+    "Serialization" should {
+
+      val serializationTestKit = new SerializationTestKit(system)
+
+      "serialize a Remit command" in {
+
+        implicit val appRequestContext: AppRequestContext = generateAppRequestContext()
+        val sourceAccountNo                               = AccountNo("source")
+        val destinationAccountNo                          = AccountNo("destination")
+        val remittanceAmount                              = BigInt(100)
+        val replyProbe                                    = testKit.createTestProbe[RemitReply]()
+        val remitCommand                                  = Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, replyProbe.ref)
+        serializationTestKit.verifySerialization(remitCommand, serializationSettings.verifyEquality)
+
+      }
+
+      "serialize a Stop command" in {
+
+        serializationTestKit.verifySerialization(Stop, serializationSettings.verifyEquality)
 
       }
 

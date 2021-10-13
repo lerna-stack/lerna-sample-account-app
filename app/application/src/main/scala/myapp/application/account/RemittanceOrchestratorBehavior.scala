@@ -1,5 +1,6 @@
 package myapp.application.account
 
+import akka.actor.NoSerializationVerificationNeeded
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import akka.actor.typed.{ ActorRef, Behavior, SupervisorStrategy }
 import akka.cluster.sharding.typed.ShardingEnvelope
@@ -213,21 +214,33 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   // 内部コマンド
   // テストで使用するために公開している。
   //
-  // ここより下は アクターが自身に対して発行するコマンドである。
+  // ここより下はアクターが自身に対して発行するコマンドである。
   // アクター外から使用することは想定しておらず、そのような使用を場合の動作は保証されない。
   //
 
-  /** 出金中に使用するコマンド */
-  sealed trait WithdrawingStateCommand extends Command
+  /** 出金中に使用するコマンド
+    *
+    * @note アクターが自身に向けて発行するのみであり、シリアライズできる必要はない
+    */
+  sealed trait WithdrawingStateCommand extends Command with NoSerializationVerificationNeeded
 
-  /** 入金中に使用するコマンド */
-  sealed trait DepositingStateCommand extends Command
+  /** 入金中に使用するコマンド
+    *
+    * @note アクターが自身に向けて発行するのみであり、シリアライズできる必要はない
+    */
+  sealed trait DepositingStateCommand extends Command with NoSerializationVerificationNeeded
 
-  /** 返金中に使用するコマンド */
-  sealed trait RefundingStateCommand extends Command
+  /** 返金中に使用するコマンド
+    *
+    * @note アクターが自身に向けて発行するのみであり、シリアライズできる必要はない
+    */
+  sealed trait RefundingStateCommand extends Command with NoSerializationVerificationNeeded
 
-  /** 取引完了後に使用するコマンド */
-  sealed trait TransactionCompletedStateCommand extends Command
+  /** 取引完了後に使用するコマンド
+    *
+    * @note アクターが自身に向けて発行するのみであり、シリアライズできる必要はない
+    */
+  sealed trait TransactionCompletedStateCommand extends Command with NoSerializationVerificationNeeded
 
   /** 送金元口座から出金する */
   case object WithdrawFromSource extends WithdrawingStateCommand
@@ -259,9 +272,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
   /** 送金を完了する */
   case object CompleteTransaction extends TransactionCompletedStateCommand
 
-  /** コマンド:パッシベーション
-    *
-    * このアクターのパッシベーションを開始する。
+  /** このアクターのパッシベーションを開始する
     */
   case object Passivate extends TransactionCompletedStateCommand
 
