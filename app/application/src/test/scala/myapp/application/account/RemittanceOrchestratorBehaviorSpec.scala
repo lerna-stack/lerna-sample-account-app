@@ -490,7 +490,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
           .warn("Withdrawal failed due to a timeout.")
-          .withMessageContains("WithdrawingFromSource")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -541,7 +540,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
           .error("Withdrawal failed with an unexpected exception.")
-          .withMessageContains("WithdrawingFromSource")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -703,7 +701,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
           .warn("Deposit failed due to a timeout.")
-          .withMessageContains("DepositingToDestination")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -754,7 +751,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
           .error("Deposit failed with an unexpected exception.")
-          .withMessageContains("DepositingToDestination")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -886,7 +882,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
           .warn("Refund failed due to a timeout.")
-          .withMessageContains("RefundingToSource")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -939,7 +934,6 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
           .error("Refund failed due to invalid argument(s).")
-          .withMessageContains("RefundingToSource")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -991,8 +985,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
         // NOTE: Error logs are crucial; This test should verify error logs are actually written.
         LoggingTestKit
-          .error("Refund failed due to an unexpected exception.")
-          .withMessageContains("RefundingToSource")
+          .error("Refund failed with an unexpected exception.")
           .withOccurrences(failureLimit)
           .expect {
 
