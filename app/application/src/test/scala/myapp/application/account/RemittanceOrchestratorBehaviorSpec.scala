@@ -75,18 +75,6 @@ object RemittanceOrchestratorBehaviorSpec {
     }
   }
 
-  private final class SuccessEventually[+R](failureLimit: Int, failureValue: R, successValue: R) {
-    private val attempts = new AtomicInteger(0)
-    def apply(): R = {
-      val attempt = attempts.getAndIncrement()
-      if (attempt < failureLimit) {
-        failureValue
-      } else {
-        successValue
-      }
-    }
-  }
-
 }
 
 /** Test [[RemittanceOrchestratorBehavior]]
@@ -484,18 +472,17 @@ final class RemittanceOrchestratorBehaviorSpec
 
       "retry withdrawal several times due to a timeout, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
 
-        val failureLimit = 3
-        val newWithdrawalResult = new SuccessEventually(
-          failureLimit,
-          Future.successful(WithdrawalResult.Timeout),
-          Future.successful(WithdrawalResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall { _ => newWithdrawalResult() }
+          .returns(Future.successful(WithdrawalResult.Timeout))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(WithdrawalResult.Succeeded(0)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(withdrawingFromSource, bankAccountApplication)
@@ -536,18 +523,17 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
 
-        val failureLimit = 3
-        val newWithdrawalResult = new SuccessEventually(
-          failureLimit,
-          Future.failed(new IllegalStateException("unexpected")),
-          Future.successful(WithdrawalResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newWithdrawalResult())
+          .returns(Future.failed(new IllegalStateException("unexpected")))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(WithdrawalResult.Succeeded(0)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(withdrawingFromSource, bankAccountApplication)
@@ -699,18 +685,17 @@ final class RemittanceOrchestratorBehaviorSpec
 
       "retry deposit several times due to a timeout, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
 
-        val failureLimit = 3
-        val newDepositResult = new SuccessEventually(
-          failureLimit,
-          Future.successful(DepositResult.Timeout),
-          Future.successful(DepositResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newDepositResult())
+          .returns(Future.successful(DepositResult.Timeout))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(1)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(depositingToDestination, bankAccountApplication)
@@ -751,18 +736,17 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
 
-        val failureLimit = 3
-        val newDepositResult = new SuccessEventually(
-          failureLimit,
-          Future.failed(new IllegalStateException("unexpected")),
-          Future.successful(DepositResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newDepositResult())
+          .returns(Future.failed(new IllegalStateException("unexpected")))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(remittanceAmount)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(depositingToDestination, bankAccountApplication)
@@ -884,18 +868,17 @@ final class RemittanceOrchestratorBehaviorSpec
 
       "retry refund several times due to a timeout, succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
 
-        val failureLimit = 3
-        val newRefundResult = new SuccessEventually(
-          failureLimit,
-          Future.successful(RefundResult.Timeout),
-          Future.successful(RefundResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newRefundResult())
+          .returns(Future.successful(RefundResult.Timeout))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(refundingToSource, bankAccountApplication)
@@ -938,18 +921,17 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
 
-        val failureLimit = 3
-        val newRefundResult = new SuccessEventually(
-          failureLimit,
-          Future.successful(RefundResult.InvalidArgument),
-          Future.successful(RefundResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newRefundResult())
+          .returns(Future.successful(RefundResult.InvalidArgument))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(refundingToSource, bankAccountApplication)
@@ -992,18 +974,17 @@ final class RemittanceOrchestratorBehaviorSpec
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
 
-        val failureLimit = 3
-        val newRefundResult = new SuccessEventually(
-          failureLimit,
-          Future.failed(new IllegalStateException("unexpected")),
-          Future.successful(RefundResult.Succeeded(0)),
-        )
+        val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
           .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
           .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
-          .repeat(failureLimit + 1)
-          .onCall(_ => newRefundResult())
+          .returns(Future.failed(new IllegalStateException("unexpected")))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
 
         val (orchestrator, persistenceId, selfProbe) =
           createEventSourcedBehaviorTestKitWithSelfProbe(refundingToSource, bankAccountApplication)
