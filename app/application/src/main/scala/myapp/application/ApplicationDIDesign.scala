@@ -1,7 +1,7 @@
 package myapp.application
 
-import myapp.adapter.account.BankAccountApplication
-import myapp.application.account.BankAccountApplicationImpl
+import myapp.adapter.account.{ BankAccountApplication, RemittanceApplication }
+import myapp.application.account.{ BankAccountApplicationImpl, RemittanceApplicationImpl }
 import wvlet.airframe.{ newDesign, Design }
 
 /** Application プロジェクト内のコンポーネントの [[wvlet.airframe.Design]] を定義する
@@ -18,4 +18,5 @@ object ApplicationDIDesign {
   @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
   val applicationDesign: Design = newDesign
     .bind[BankAccountApplication].to[BankAccountApplicationImpl]
+    .bind[RemittanceApplication].to[RemittanceApplicationImpl]
 }

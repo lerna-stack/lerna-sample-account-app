@@ -7,6 +7,8 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 ## Unreleased
 
 - RDBMS を介して連携されるデータを Entity にインポートするサンプル実装を追加しました [PR#19](https://github.com/lerna-stack/lerna-sample-account-app/pull/19)
+- 送金機能を実装しました [PR#29](https://github.com/lerna-stack/lerna-sample-account-app/pull/29)
+  - 送金のアーキテクチャは [送金機能](docs/remittance-orchestrator/index.md) で確認できます
 
 ### Changed
 - 送金機能の実装に向けて 入出金機能のAPI を変更しました [PR#25](https://github.com/lerna-stack/lerna-sample-account-app/pull/25)

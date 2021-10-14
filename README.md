@@ -66,8 +66,11 @@ sbt clean test:compile test
   * 口座の残高が0未満になるような出金を行うことはできません。
 * [返金](#返金)
   * 返金によって口座残高が上限を超えることがあります。
+* [送金](#送金)
+  * 送金によって送金元口座の残高が不足する場合には送金できません。
+  * 送金によって送金先口座の残高が上限を超える場合には送金できません。
 
-### 冪等性を保証するためのID
+### 冪等性を保証するための取引ID
 
 入金、出金、返金には、冪等性を保証するために ID を指定します。  
 この ID を、*取引ID* と呼びます。
@@ -229,6 +232,44 @@ curl \
 * その出金の取引ID が出金に対応するか
 
 出金の取引ID の妥当性は、このAPIの利用者が保証する必要があります。
+
+
+## 送金
+送金元口座から送金先口座に指定金額を送金します。
+どちらの口座も同じテナントに所属している必要があります。
+
+送金に成功すると、HTTPステータスコード 200 OK を返します。
+送金金額が0以下である等の不正なリクエストであった場合には、HTTPステータスコード 400 BadRequest を返します。
+送金処理でタイムアウトが発生した場合には、HTTPステータスコード 503 ServiceUnavailable を返します。
+
+送金でタイムアウトが発生した場合には、同じ 送金取引ID を指定してリトライすることができます。
+送金取引ID により冪等性が保証されています。
+同じ 送金取引ID を指定してリトライする場合、前回とまったく同じパラメータ(送金元口座、送金先口座、送金金額) を指定する必要があります。
+異なるパラメータが指定された場合、このAPIは 400 BadRequest を返します。
+
+※送金取引IDは、入金・出金・返金で使用した取引IDとは異なり、送金のみで使用されます。
+送金取引IDは同じテナント内で一意である必要があります。
+
+- method: `PUT`
+- path: `/remittance/${remittanceTransactionId}`
+    - 送金取引ID: `remittanceTransactionId`
+- query parameters:
+    - 送金元口座番号: `sourceAccountNo`
+    - 送金先口座番号: `destinationAccountNo`
+    - 送金金額: `amount`
+- headers
+    - テナント: `X-Tenant-Id: ${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'PUT' \
+    --url "http://127.0.0.1:9001/remittance/$(date '+%s')?sourceAccountNo=test33&destinationAccountNo=test44&amount=100" \
+    --header 'X-Tenant-Id: tenant-a'
+```
+
+送金のアーキテクチャは、[送金機能](docs/remittance-orchestrator/index.md) を参照してください。
 
 
 ## バッチ入金
