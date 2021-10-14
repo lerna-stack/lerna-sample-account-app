@@ -1820,14 +1820,22 @@ final class RemittanceOrchestratorBehaviorSpec
         }
         orchestrator.persistenceTestKit.withPolicy(SecondOperationFailurePolicy)
 
-        val remitCommand = Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, _)
-        val result       = orchestrator.runCommand(remitCommand)
+        LoggingTestKit
+          .error(
+            s"Failed to persist event type [myapp.application.account.RemittanceOrchestratorBehavior$$WithdrawalSucceeded]",
+          )
+          .expect {
 
-        expect(result.reply === RemitSucceeded)
-        orchestrator.persistenceTestKit.expectNextPersistedType[TransactionCreated](persistenceId.id)
-        orchestrator.persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
-        orchestrator.persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
-        expect(result.state.isInstanceOf[State.Succeeded])
+            val remitCommand = Remit(sourceAccountNo, destinationAccountNo, remittanceAmount, _)
+            val result       = orchestrator.runCommand(remitCommand)
+
+            expect(result.reply === RemitSucceeded)
+            orchestrator.persistenceTestKit.expectNextPersistedType[TransactionCreated](persistenceId.id)
+            orchestrator.persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)
+            orchestrator.persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)
+            expect(result.state.isInstanceOf[State.Succeeded])
+
+          }
 
       }
 
