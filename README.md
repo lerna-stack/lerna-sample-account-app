@@ -385,3 +385,8 @@ RPM パッケージをビルドする前に、この条件が満たされてい�
 ## CHANGELOG
 
 特筆すべき変更点は [CHANGELOG.md](CHANGELOG.md) から確認できます。
+
+## License
+lerna-sample-account-app is released under the terms of the [Apache License Version 2.0](LICENSE).
+
+© 2021 TIS Inc.
