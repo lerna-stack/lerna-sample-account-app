@@ -6,6 +6,10 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
+
+## [v2021.10.0] - 2021-10-22
+[v2021.10.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2021.7.0...v2021.10.0
+
 - RDBMS を介して連携されるデータを Entity にインポートするサンプル実装を追加しました [PR#19](https://github.com/lerna-stack/lerna-sample-account-app/pull/19)
 - 送金機能を実装しました [PR#29](https://github.com/lerna-stack/lerna-sample-account-app/pull/29)
   - 送金のアーキテクチャは [送金機能](docs/remittance-orchestrator/index.md) で確認できます
@@ -29,6 +33,7 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
   バイナリ互換性を維持しやすくするため、lerna-app-library が使用する wiremock-jre8 と同じバージョンとしています。
 
 
-## Version 2021.7.0
+## [v2021.7.0] - 2021-7-16
+[v2021.7.0]: https://github.com/lerna-stack/lerna-sample-account-app/releases/tag/v2021.7.0
 
 - Initial release
