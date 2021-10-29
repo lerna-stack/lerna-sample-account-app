@@ -4,6 +4,7 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.typed.{ Behavior, PreRestart }
 import akka.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.Config
+import myapp.application.util.healthcheck.JDBCHealthCheckService
 import myapp.entrypoint.Main.{ config, logger, system }
 import wvlet.airframe.Design
 
@@ -34,6 +35,7 @@ object AppGuardian {
     }
 
     session.build[MyApp].start()
+    context.spawn(session.build[JDBCHealthCheckService].createBehavior(), "JDBCHealthChecker")
 
     Behaviors.receiveSignal {
       case (_, PreRestart) =>
