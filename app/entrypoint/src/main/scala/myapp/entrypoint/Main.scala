@@ -37,7 +37,7 @@ object Main extends App with AppLogging {
   }
 
   private val system: ActorSystem[Nothing] =
-    ActorSystem[Nothing](Behaviors.empty, "MyAppSystem", config)
+    ActorSystem[Nothing](AppGuardian(config), "MyAppSystem", config)
   logger.info("ActorSystem({})起動完了", system)
 
   val cluster = Cluster(system)
@@ -45,25 +45,5 @@ object Main extends App with AppLogging {
 
   cluster.registerOnMemberUp {
     logger.info("Akka Clusterへの参加完了: {}", cluster.state)
-
-    val serverMode = config.getString("myapp.server-mode")
-    val design: Design = serverMode match {
-      case "PRODUCTION" => DIDesign.design(system).withProductionMode
-      case "DEV"        => DIDesign.design(system)
-      case _            => throw new IllegalStateException(s"Illegal server-mode: $serverMode")
-    }
-
-    val session = design.newSessionBuilder.noShutdownHook.create
-    session.start
-
-    CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseServiceStop, taskName = "shutdown-airframe-session") {
-      () =>
-        logger.info(s"終了処理のため、airframe session を shutdown します")
-        session.shutdown
-
-        Future.successful(akka.Done)
-    }
-
-    session.build[MyApp].start()
   }
 }
