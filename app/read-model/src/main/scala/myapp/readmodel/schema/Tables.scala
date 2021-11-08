@@ -18,7 +18,8 @@ trait Tables {
   import slick.jdbc.{ GetResult => GR }
 
   /** DDL for all tables. Call .create to execute. */
-  lazy val schema: profile.SchemaDescription = AkkaProjectionOffsetStore.schema ++ DepositStore.schema
+  lazy val schema: profile.SchemaDescription =
+    AkkaProjectionOffsetStore.schema ++ DepositStore.schema ++ TransactionStore.schema
   @deprecated("Use .schema instead of .ddl", "3.0")
   def ddl = schema
 
@@ -149,4 +150,43 @@ trait Tables {
 
   /** Collection-like TableQuery object for table DepositStore */
   lazy val DepositStore = new TableQuery(tag => new DepositStore(tag))
+
+  /** Entity class storing rows of table TransactionStore
+    *  @param transactionId Database column transaction_id SqlType(VARCHAR), PrimaryKey, Length(255,true)
+    *  @param transactionType Database column transaction_type SqlType(CHAR), Length(16,false)
+    *  @param amount Database column amount SqlType(BIGINT)
+    */
+  case class TransactionStoreRow(transactionId: String, transactionType: String, amount: Long)
+
+  /** GetResult implicit for fetching TransactionStoreRow objects using plain SQL queries */
+  implicit
+  def GetResultTransactionStoreRow(implicit e0: GR[String], e1: GR[Long]): GR[TransactionStoreRow] = GR { prs =>
+    import prs._
+    TransactionStoreRow.tupled((<<[String], <<[String], <<[Long]))
+  }
+
+  /** Table description of table transaction_store. Objects of this class serve as prototypes for rows in queries. */
+
+  class TransactionStore(_tableTag: Tag)
+      extends profile.api.Table[TransactionStoreRow](_tableTag, None, "transaction_store") {
+    def * = (transactionId, transactionType, amount) <> (TransactionStoreRow.tupled, TransactionStoreRow.unapply)
+
+    /** Maps whole row to an option. Useful for outer joins. */
+    def ? = ((Rep.Some(transactionId), Rep.Some(transactionType), Rep.Some(amount))).shaped.<>(
+      { r => import r._; _1.map(_ => TransactionStoreRow.tupled((_1.get, _2.get, _3.get))) },
+      (_: Any) => throw new Exception("Inserting into ? projection not supported."),
+    )
+
+    /** Database column transaction_id SqlType(VARCHAR), PrimaryKey, Length(255,true) */
+    val transactionId: Rep[String] = column[String]("transaction_id", O.PrimaryKey, O.Length(255, varying = true))
+
+    /** Database column transaction_type SqlType(CHAR), Length(16,false) */
+    val transactionType: Rep[String] = column[String]("transaction_type", O.Length(16, varying = false))
+
+    /** Database column amount SqlType(BIGINT) */
+    val amount: Rep[Long] = column[Long]("amount")
+  }
+
+  /** Collection-like TableQuery object for table TransactionStore */
+  lazy val TransactionStore = new TableQuery(tag => new TransactionStore(tag))
 }
