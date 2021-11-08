@@ -5,7 +5,7 @@ import slick.basic.DatabaseConfig
 import slick.dbio.DBIO
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ ExecutionContext, Future }
 
 case class Transaction(transactionId: String, eventName: String, amount: Int)
 
@@ -35,4 +35,3 @@ class TransactionRepositoryImpl(val dbConfig: DatabaseConfig[JdbcProfile]) exten
     def amount = column[Int]("AMOUNT")
   }
 }
-

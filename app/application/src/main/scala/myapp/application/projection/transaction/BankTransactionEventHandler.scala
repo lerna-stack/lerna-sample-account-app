@@ -20,7 +20,8 @@ import slick.dbio.DBIO
 import scala.concurrent.ExecutionContext
 
 class BankTransactionEventHandler(repository: TransactionRepository)(implicit ec: ExecutionContext)
-  extends AppEventHandler[BankAccountBehavior.DomainEvent] with AppLogging {
+    extends AppEventHandler[BankAccountBehavior.DomainEvent]
+    with AppLogging {
 
   override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
     BankAccountEventAdapter.BankAccountTransactionEventTag
