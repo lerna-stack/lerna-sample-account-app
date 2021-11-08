@@ -17,7 +17,10 @@ import myapp.application.projection.AppEventHandler
 import myapp.utility.AppRequestContext
 import slick.dbio.DBIO
 
-class BankTransactionEventHandler extends AppEventHandler[BankAccountBehavior.DomainEvent] with AppLogging {
+import scala.concurrent.ExecutionContext
+
+class BankTransactionEventHandler(repository: TransactionRepository)(implicit ec: ExecutionContext)
+  extends AppEventHandler[BankAccountBehavior.DomainEvent] with AppLogging {
 
   override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
     BankAccountEventAdapter.BankAccountTransactionEventTag
@@ -28,6 +31,7 @@ class BankTransactionEventHandler extends AppEventHandler[BankAccountBehavior.Do
     envelope.event match {
       case Deposited(transactionId, amount) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
+        repository.save(Transaction(transactionId.value, "Deposited", amount.toInt))
         DBIO.successful(Done)
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
