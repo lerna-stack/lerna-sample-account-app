@@ -53,7 +53,7 @@ class BankTransactionEventHandlerSpec extends ScalaTestWithTypedActorTestKit() w
       implicit val ec: ExecutionContextExecutor         = system.executionContext
       implicit val appRequestContext: AppRequestContext = AppRequestContext(TraceId("trace_id"), TenantA)
       val repository                                    = new MockTransactionRepository()
-      val handler                                       = new BankTransactionEventHandler(repository)
+      val handler                                       = new BankTransactionEventHandler(system, repository)
 
       val events = Source(
         List(

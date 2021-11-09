@@ -1,6 +1,7 @@
 package myapp.application.projection.transaction
 
 import akka.Done
+import akka.actor.typed.ActorSystem
 import akka.projection.eventsourced.EventEnvelope
 import lerna.log.AppLogging
 import myapp.application.account.{ BankAccountBehavior, BankAccountEventAdapter }
@@ -17,11 +18,11 @@ import myapp.application.projection.AppEventHandler
 import myapp.utility.AppRequestContext
 import slick.dbio.DBIO
 
-import scala.concurrent.ExecutionContext
-
-class BankTransactionEventHandler(repository: TransactionRepository)(implicit ec: ExecutionContext)
+class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: TransactionRepository)
     extends AppEventHandler[BankAccountBehavior.DomainEvent]
     with AppLogging {
+
+  implicit val ec = system.executionContext
 
   override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
     BankAccountEventAdapter.BankAccountTransactionEventTag
