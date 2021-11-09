@@ -34,7 +34,6 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
       case Deposited(transactionId, amount) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
         repository.save(Transaction(transactionId.value, "Deposited", amount.toInt))
-        DBIO.successful(Done)
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
