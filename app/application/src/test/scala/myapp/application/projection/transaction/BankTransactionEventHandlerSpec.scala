@@ -21,6 +21,7 @@ import scala.concurrent.{ ExecutionContext, ExecutionContextExecutor, Future }
 
 object BankTransactionEventHandlerSpec {
   class MockTransactionRepository extends TransactionRepository {
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var table: Vector[Transaction] = Vector[Transaction]()
 
     override def save(transaction: Transaction)(implicit ec: ExecutionContext): DBIO[Done] = DBIO.successful {
