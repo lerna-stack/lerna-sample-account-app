@@ -33,13 +33,13 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
     envelope.event match {
       case Deposited(transactionId, amount) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId.value, "Deposited", amount.toInt))
+        repository.save(Transaction(transactionId.value, "Deposited", amount))
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
       case Withdrew(transactionId, amount) =>
         logger.info("Withdrew(transactionId: {}, amount: {})", transactionId, amount)
-        DBIO.successful(Done)
+        repository.save(Transaction(transactionId.value, "Withdrew", amount))
       case BalanceShorted(transactionId) =>
         logger.info("BalanceShorted(transactionId: {})", transactionId)
         DBIO.successful(Done)
@@ -50,7 +50,7 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
           withdrawalTransactionId,
           amount,
         )
-        DBIO.successful(Done)
+        repository.save(Transaction(transactionId.value, "Refunded", amount))
       case InvalidRefundRequested(transactionId, withdrawalTransactionId, amount) =>
         logger.info(
           "InvalidRefundRequested(transactionId: {}, withdrawalTransactionId: {}, amount: {}",

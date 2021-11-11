@@ -6,7 +6,7 @@ import slick.dbio.DBIO
 
 import scala.concurrent.ExecutionContext
 
-final case class Transaction(transactionId: String, eventName: String, amount: Long)
+final case class Transaction(transactionId: String, eventName: String, amount: BigInt)
 
 trait TransactionRepository {
   def save(transaction: Transaction)(implicit ec: ExecutionContext): DBIO[Done]
@@ -15,9 +15,11 @@ trait TransactionRepository {
 class TransactionRepositoryImpl(tables: Tables) extends TransactionRepository {
   import tables._
   import tables.profile.api._
-  override def save(transaction: Transaction)(implicit ec: ExecutionContext) = {
+  override def save(transaction: Transaction)(implicit ec: ExecutionContext): slick.dbio.DBIO[Done] = {
     TransactionStore
-      .insertOrUpdate(TransactionStoreRow(transaction.transactionId, transaction.eventName, transaction.amount))
+      .insertOrUpdate(
+        TransactionStoreRow(transaction.transactionId, transaction.eventName, transaction.amount.longValue),
+      )
       .map(_ => Done)
   }
 }
