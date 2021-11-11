@@ -16,10 +16,11 @@ class TransactionRepositoryImpl(tables: Tables) extends TransactionRepository {
   import tables._
   import tables.profile.api._
   override def save(transaction: Transaction)(implicit ec: ExecutionContext): slick.dbio.DBIO[Done] = {
-    TransactionStore
-      .insertOrUpdate(
-        TransactionStoreRow(transaction.transactionId, transaction.eventName, transaction.amount.longValue),
-      )
+    (TransactionStore += TransactionStoreRow(
+      transaction.transactionId,
+      transaction.eventName,
+      transaction.amount.longValue,
+    ))
       .map(_ => Done)
   }
 }
