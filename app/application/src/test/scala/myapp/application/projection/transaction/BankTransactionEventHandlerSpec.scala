@@ -10,7 +10,7 @@ import akka.stream.scaladsl.Source
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
 import myapp.adapter.account.TransactionId
-import myapp.application.account.BankAccountBehavior.{ Deposited, DomainEvent }
+import myapp.application.account.BankAccountBehavior.{ Deposited, DomainEvent, Refunded, Withdrew }
 import myapp.application.projection.AppEventHandler
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.TenantA
@@ -58,10 +58,10 @@ class BankTransactionEventHandlerSpec extends ScalaTestWithTypedActorTestKit() w
       val events = Source(
         List(
           createEnvelope(Deposited(TransactionId("id0"), BigInt(100000)), 0L),
-          createEnvelope(Deposited(TransactionId("id1"), BigInt(5000)), 0L),
-          createEnvelope(Deposited(TransactionId("id2"), BigInt(10000)), 0L),
-          createEnvelope(Deposited(TransactionId("id3"), BigInt(2000)), 0L),
-          createEnvelope(Deposited(TransactionId("id4"), BigInt(200000)), 0L),
+          createEnvelope(Withdrew(TransactionId("id1"), BigInt(5000)), 1L),
+          createEnvelope(Withdrew(TransactionId("id2"), BigInt(10000)), 2L),
+          createEnvelope(Refunded(TransactionId("id3"), TransactionId("id2"), BigInt(2000)), 3L),
+          createEnvelope(Deposited(TransactionId("id4"), BigInt(200000)), 4L),
         ),
       )
 
@@ -73,9 +73,9 @@ class BankTransactionEventHandlerSpec extends ScalaTestWithTypedActorTestKit() w
       projectionTestKit.run(projection) {
         repository.table shouldBe Vector(
           Transaction("id0", "Deposited", 100000),
-          Transaction("id1", "Deposited", 5000),
-          Transaction("id2", "Deposited", 10000),
-          Transaction("id3", "Deposited", 2000),
+          Transaction("id1", "Withdrew", 5000),
+          Transaction("id2", "Withdrew", 10000),
+          Transaction("id3", "Refunded", 2000),
           Transaction("id4", "Deposited", 200000),
         )
       }
