@@ -24,12 +24,7 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
 
   import AppEventHandler._
 
-  protected def eventTag: AggregateEventTag[E]
-
   def createBehavior(setup: BehaviorSetup): Behavior[ProjectionBehavior.Command] = {
-
-    implicit val system: ActorSystem[_] = setup.system
-
     val sourceProvider: SourceProvider[Offset, EventEnvelope[E]] =
       EventSourcedProvider.eventsByTag[E](
         setup.system,
@@ -37,14 +32,22 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
         tag = eventTag.tag,
       )
 
-    val projection: Projection[EventEnvelope[E]] =
-      SlickProjection.exactlyOnce(
-        projectionId = ProjectionId(eventTag.tag, setup.tenant.id),
-        sourceProvider = sourceProvider,
-        setup.dbConfig,
-        handler = () => this,
-      )
-    ProjectionBehavior(projection)
+    ProjectionBehavior(createProjection(setup, sourceProvider))
   }
+
+  def createProjection(
+      setup: BehaviorSetup,
+      sourceProvider: SourceProvider[Offset, EventEnvelope[E]],
+  ): Projection[EventEnvelope[E]] = {
+    implicit val system: ActorSystem[_] = setup.system
+    SlickProjection.exactlyOnce(
+      projectionId = ProjectionId(eventTag.tag, setup.tenant.id),
+      sourceProvider = sourceProvider,
+      setup.dbConfig,
+      handler = () => this,
+    )
+  }
+
+  protected def eventTag: AggregateEventTag[E]
 
 }
