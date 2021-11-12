@@ -74,10 +74,13 @@ class BankTransactionEventHandlerSpec
 
       val projection: Projection[EventEnvelope[DomainEvent]] = createProjection(envelopedEvents: _*)
 
-      val expected: Vector[TransactionStoreRow] = events.map {
-        case Deposited(id, amount)   => TransactionStoreRow(id.value, "Deposited", amount.longValue)
-        case Withdrew(id, amount)    => TransactionStoreRow(id.value, "Withdrew", amount.longValue)
-        case Refunded(id, _, amount) => TransactionStoreRow(id.value, "Refunded", amount.longValue)
+      val expected: Vector[TransactionStoreRow] = events.foldLeft(Vector[TransactionStoreRow]()) { (acc, event) =>
+        event match {
+          case Deposited(id, amount)   => acc :+ TransactionStoreRow(id.value, "Deposited", amount.longValue)
+          case Withdrew(id, amount)    => acc :+ TransactionStoreRow(id.value, "Withdrew", amount.longValue)
+          case Refunded(id, _, amount) => acc :+ TransactionStoreRow(id.value, "Refunded", amount.longValue)
+          case _                       => acc
+        }
       }
       projectionTestKit.run(projection) {
         db.validate(TransactionStore.result) { result =>
