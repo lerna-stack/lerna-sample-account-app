@@ -6,8 +6,6 @@ import slick.dbio.DBIO
 
 import scala.concurrent.ExecutionContext
 
-final case class Transaction(transactionId: String, eventName: String, amount: BigInt)
-
 trait TransactionRepository {
   def save(transaction: Transaction)(implicit ec: ExecutionContext): DBIO[Done]
 }
@@ -18,7 +16,7 @@ class TransactionRepositoryImpl(tables: Tables) extends TransactionRepository {
   override def save(transaction: Transaction)(implicit ec: ExecutionContext): slick.dbio.DBIO[Done] = {
     (TransactionStore += TransactionStoreRow(
       transaction.transactionId,
-      transaction.eventName,
+      transaction.eventType.toString,
       transaction.amount.longValue,
     ))
       .map(_ => Done)

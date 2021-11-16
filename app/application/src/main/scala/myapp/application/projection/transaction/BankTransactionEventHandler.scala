@@ -4,15 +4,8 @@ import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.projection.eventsourced.EventEnvelope
 import lerna.log.AppLogging
+import myapp.application.account.BankAccountBehavior._
 import myapp.application.account.{ BankAccountBehavior, BankAccountEventAdapter }
-import myapp.application.account.BankAccountBehavior.{
-  BalanceExceeded,
-  BalanceShorted,
-  Deposited,
-  InvalidRefundRequested,
-  Refunded,
-  Withdrew,
-}
 import myapp.application.persistence.AggregateEventTag
 import myapp.application.projection.AppEventHandler
 import myapp.utility.AppRequestContext
@@ -24,22 +17,19 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
 
   implicit val ec = system.executionContext
 
-  override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
-    BankAccountEventAdapter.BankAccountTransactionEventTag
-
   override def process(envelope: EventEnvelope[BankAccountBehavior.DomainEvent]): DBIO[Done] = {
     implicit val requestContext: AppRequestContext = envelope.event.appRequestContext
 
     envelope.event match {
       case Deposited(transactionId, amount) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId.value, "Deposited", amount))
+        repository.save(Transaction(transactionId.value, TransactionEventType.Deposited, amount))
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
       case Withdrew(transactionId, amount) =>
         logger.info("Withdrew(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId.value, "Withdrew", amount))
+        repository.save(Transaction(transactionId.value, TransactionEventType.Withdrew, amount))
       case BalanceShorted(transactionId) =>
         logger.info("BalanceShorted(transactionId: {})", transactionId)
         DBIO.successful(Done)
@@ -50,7 +40,7 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
           withdrawalTransactionId,
           amount,
         )
-        repository.save(Transaction(transactionId.value, "Refunded", amount))
+        repository.save(Transaction(transactionId.value, TransactionEventType.Refunded, amount))
       case InvalidRefundRequested(transactionId, withdrawalTransactionId, amount) =>
         logger.info(
           "InvalidRefundRequested(transactionId: {}, withdrawalTransactionId: {}, amount: {}",
@@ -61,4 +51,7 @@ class BankTransactionEventHandler(system: ActorSystem[Nothing], repository: Tran
         DBIO.successful(Done)
     }
   }
+
+  override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
+    BankAccountEventAdapter.BankAccountTransactionEventTag
 }
