@@ -83,7 +83,7 @@ class BankTransactionEventHandlerSpec
 
       projectionTestKit.run(projection) {
         db.validate(TransactionStore.result) { result =>
-          result should contain theSameElementsAs expected
+          expect(result === expected)
         }
       }
     }
