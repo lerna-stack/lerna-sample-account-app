@@ -76,10 +76,13 @@ class BankTransactionEventHandlerSpec
 
       val expected: Vector[TransactionStoreRow] = events.foldLeft(Vector[TransactionStoreRow]()) { (acc, event) =>
         event match {
-          case Deposited(id, amount)   => acc :+ TransactionStoreRow(id.value, "Deposited", amount.longValue)
-          case Withdrew(id, amount)    => acc :+ TransactionStoreRow(id.value, "Withdrew", amount.longValue)
-          case Refunded(id, _, amount) => acc :+ TransactionStoreRow(id.value, "Refunded", amount.longValue)
-          case _                       => acc
+          case Deposited(id, amount) =>
+            acc :+ TransactionStoreRow(id.value, TransactionEventType.Deposited.toString, amount.longValue)
+          case Withdrew(id, amount) =>
+            acc :+ TransactionStoreRow(id.value, TransactionEventType.Withdrew.toString, amount.longValue)
+          case Refunded(id, _, amount) =>
+            acc :+ TransactionStoreRow(id.value, TransactionEventType.Refunded.toString, amount.longValue)
+          case _ => acc
         }
       }
       projectionTestKit.run(projection) {
