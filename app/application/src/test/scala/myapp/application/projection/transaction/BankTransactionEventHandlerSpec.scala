@@ -24,7 +24,6 @@ import wvlet.airframe.{ newDesign, Design }
   Array(
     "org.wartremover.contrib.warts.MissingOverride",
     "org.wartremover.warts.Equals",
-    "org.wartremover.warts.IsInstanceOf",
   ),
 )
 class BankTransactionEventHandlerSpec
