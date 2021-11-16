@@ -74,17 +74,14 @@ class BankTransactionEventHandlerSpec
 
       val projection: Projection[EventEnvelope[DomainEvent]] = createProjection(envelopedEvents: _*)
 
-      val expected: Vector[TransactionStoreRow] = events.foldLeft(Vector[TransactionStoreRow]()) { (acc, event) =>
-        event match {
-          case Deposited(id, amount) =>
-            acc :+ TransactionStoreRow(id.value, TransactionEventType.Deposited.toString, amount.longValue)
-          case Withdrew(id, amount) =>
-            acc :+ TransactionStoreRow(id.value, TransactionEventType.Withdrew.toString, amount.longValue)
-          case Refunded(id, _, amount) =>
-            acc :+ TransactionStoreRow(id.value, TransactionEventType.Refunded.toString, amount.longValue)
-          case _ => acc
-        }
-      }
+      val expected = Vector(
+        TransactionStoreRow("id0", "Deposited", 100000),
+        TransactionStoreRow("id1", "Withdrew", 5000),
+        TransactionStoreRow("id2", "Withdrew", 10000),
+        TransactionStoreRow("id3", "Refunded", 2000),
+        TransactionStoreRow("id4", "Deposited", 200000),
+      )
+
       projectionTestKit.run(projection) {
         db.validate(TransactionStore.result) { result =>
           result should contain theSameElementsAs expected
