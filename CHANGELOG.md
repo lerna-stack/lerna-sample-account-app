@@ -6,6 +6,9 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
+### Changed
+- 入出金明細出力の実装に向けてQuery側DBを更新できるよう変更 [PR#32](https://github.com/lerna-stack/lerna-sample-account-app/pull/32)
+  - `Deposited`, `Withdrew`, `Refunded` イベント発生時に取引ID、イベント名と取引額を保存します
 
 ## [v2021.10.0] - 2021-10-22
 [v2021.10.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2021.7.0...v2021.10.0
