@@ -24,6 +24,8 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
 
   import AppEventHandler._
 
+  protected def eventTag: AggregateEventTag[E]
+
   def createBehavior(setup: BehaviorSetup): Behavior[ProjectionBehavior.Command] = {
     val sourceProvider: SourceProvider[Offset, EventEnvelope[E]] =
       EventSourcedProvider.eventsByTag[E](
@@ -47,7 +49,4 @@ trait AppEventHandler[E] extends SlickHandler[EventEnvelope[E]] {
       handler = () => this,
     )
   }
-
-  protected def eventTag: AggregateEventTag[E]
-
 }

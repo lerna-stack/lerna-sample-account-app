@@ -14,6 +14,9 @@ class BankTransactionEventHandler(repository: TransactionRepository)
     extends AppEventHandler[BankAccountBehavior.DomainEvent]
     with AppLogging {
 
+  override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
+    BankAccountEventAdapter.BankAccountTransactionEventTag
+
   override def process(envelope: EventEnvelope[BankAccountBehavior.DomainEvent]): DBIO[Done] = {
     implicit val requestContext: AppRequestContext = envelope.event.appRequestContext
 
@@ -48,7 +51,4 @@ class BankTransactionEventHandler(repository: TransactionRepository)
         DBIO.successful(Done)
     }
   }
-
-  override protected def eventTag: AggregateEventTag[BankAccountBehavior.DomainEvent] =
-    BankAccountEventAdapter.BankAccountTransactionEventTag
 }
