@@ -24,9 +24,11 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
 
   object AccountRoute {
     import BankAccountApplication._
+    import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
     def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       concat(
+        getAccountStatementRoute(accountNo),
         fetchBalanceRoute(accountNo),
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
           concat(
@@ -45,6 +47,16 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
             complete(balance.toString + "\n")
           case FetchBalanceResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
+        }
+      }
+    }
+
+    private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
+      (path("transactions") & get) {
+        onSuccess(bankAccountApplication.getAccountStatement(accountNo)) {
+          case GetAccountStatementResult.Succeeded(statement) =>
+            val response = AccountStatementResponse(accountNo, statement.transactions)
+            complete(StatusCodes.OK -> response)
         }
       }
     }
