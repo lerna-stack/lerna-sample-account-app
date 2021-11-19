@@ -55,7 +55,7 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
       (path("transactions") & get) {
         onSuccess(bankAccountApplication.getAccountStatement(accountNo)) {
           case GetAccountStatementResult.Succeeded(statement) =>
-            val response = AccountStatementResponse(accountNo, statement.transactions)
+            val response = AccountStatementResponse.from(accountNo, statement)
             complete(StatusCodes.OK -> response)
         }
       }
