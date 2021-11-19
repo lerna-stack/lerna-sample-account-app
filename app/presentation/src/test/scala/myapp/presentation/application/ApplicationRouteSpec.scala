@@ -8,10 +8,11 @@ import lerna.testkit.airframe.DISessionSupport
 import myapp.adapter.account.BankAccountApplication.{
   DepositResult,
   FetchBalanceResult,
+  GetAccountStatementResult,
   RefundResult,
   WithdrawalResult,
 }
-import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.adapter.account.{ AccountNo, AccountStatementDto, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -44,6 +45,8 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     AppRequestContext,
     Future[RefundResult],
   ] = accountService.refund(_, _, _, _)(_)
+  private val getAccountStatement: MockFunction2[AccountNo, AppRequestContext, Future[GetAccountStatementResult]] =
+    accountService.getAccountStatement(_)(_)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -332,6 +335,41 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return the account statement of the given account" in {
+
+      getAccountStatement
+        .expects(where { (accountNo, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(
+          Future.successful(
+            GetAccountStatementResult.Succeeded(
+              AccountStatementDto(
+                List(
+                  TransactionDto(
+                    "transactionId",
+                    "Deposited",
+                    1000,
+                    10000,
+                    1637285782,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+
+      import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+      Get("/accounts/123-456/transactions").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.OK)
+        expect(
+          responseAs[AccountStatementResponse] === AccountStatementResponse.from(
+            AccountNo("123-456"),
+            AccountStatementDto(List(TransactionDto("transactionId", "Deposited", 1000, 10000, 1637285782))),
+          ),
+        )
+      }
+    }
   }
 
 }
