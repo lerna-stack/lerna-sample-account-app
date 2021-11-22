@@ -109,7 +109,4 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       }
   }
 
-  override def getAccountStatement(accountNo: AccountNo)(implicit
-      appRequestContext: AppRequestContext,
-  ): Future[GetAccountStatementResult] = ???
 }

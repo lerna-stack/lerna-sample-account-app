@@ -111,9 +111,6 @@ trait BankAccountApplication {
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[RefundResult]
 
-  def getAccountStatement(accountNo: AccountNo)(implicit
-      appRequestContext: AppRequestContext,
-  ): Future[GetAccountStatementResult]
 }
 
 object BankAccountApplication {
@@ -221,8 +218,4 @@ object BankAccountApplication {
 
   }
 
-  sealed trait GetAccountStatementResult extends Product with Serializable
-  object GetAccountStatementResult {
-    final case class Succeeded(statementDto: AccountStatementDto) extends GetAccountStatementResult
-  }
 }

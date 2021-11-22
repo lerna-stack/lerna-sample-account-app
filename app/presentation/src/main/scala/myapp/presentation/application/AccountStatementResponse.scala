@@ -1,17 +1,17 @@
 package myapp.presentation.application
 
 import lerna.http.json.AnyValJsonFormat
-import myapp.adapter.account.{ AccountNo, AccountStatementDto, TransactionDto }
+import myapp.adapter.account.{ AccountNo, TransactionDto }
 import spray.json.{ JsonFormat, RootJsonFormat }
 
 final case class AccountStatementResponse(
     accountNo: AccountNo,
-    transactions: List[TransactionDto],
+    transactions: Seq[TransactionDto],
 )
 
 object AccountStatementResponse {
-  def from(accountNo: AccountNo, accountStatementDto: AccountStatementDto): AccountStatementResponse =
-    AccountStatementResponse(accountNo, accountStatementDto.transactions)
+  def from(accountNo: AccountNo, transactionList: Seq[TransactionDto]): AccountStatementResponse =
+    AccountStatementResponse(accountNo, transactionList)
 
   import spray.json.DefaultJsonProtocol._
 

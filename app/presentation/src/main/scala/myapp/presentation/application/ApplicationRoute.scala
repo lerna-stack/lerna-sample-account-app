@@ -1,13 +1,19 @@
 package myapp.presentation.application
 
+import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.adapter.query.ReadTransactionRepository
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
 
-class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
+class ApplicationRoute(
+    bankAccountApplication: BankAccountApplication,
+    readTransactionRepository: ReadTransactionRepository,
+    system: ActorSystem[Nothing],
+) {
 
   import ApplicationRoute._
 
@@ -53,10 +59,11 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
 
     private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       (path("transactions") & get) {
-        onSuccess(bankAccountApplication.getAccountStatement(accountNo)) {
-          case GetAccountStatementResult.Succeeded(statement) =>
-            val response = AccountStatementResponse.from(accountNo, statement)
-            complete(StatusCodes.OK -> response)
+        val futureRepositoryResponse = readTransactionRepository.getTransactionList(accountNo)
+        val futureResponse =
+          futureRepositoryResponse.map(AccountStatementResponse.from(accountNo, _))(system.executionContext)
+        onSuccess(futureResponse) { response =>
+          complete(StatusCodes.OK -> response)
         }
       }
     }
