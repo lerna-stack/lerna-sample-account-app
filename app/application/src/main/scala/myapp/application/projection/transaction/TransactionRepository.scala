@@ -17,7 +17,9 @@ class TransactionRepositoryImpl(tables: Tables, system: ActorSystem[Nothing]) ex
     (TransactionStore += TransactionStoreRow(
       transaction.transactionId.value,
       transaction.eventType.toString,
+      transaction.accountNo.value,
       transaction.amount.longValue,
+      transaction.transactedAt,
     ))
       .map(_ => Done)
   }
