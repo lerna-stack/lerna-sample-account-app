@@ -50,8 +50,8 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   ] = accountService.refund(_, _, _, _)(_)
 
   private val readTransactionRepository = diSession.build[ReadTransactionRepository]
-  private val getTransactionList: MockFunction1[AccountNo, Future[Seq[TransactionDto]]] =
-    readTransactionRepository.getTransactionList(_)
+  private val getTransactionList: MockFunction2[AccountNo, AppTenant, Future[Seq[TransactionDto]]] =
+    readTransactionRepository.getTransactionList(_, _)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -343,7 +343,10 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     "return the account statement of the given account" in {
 
       getTransactionList
-        .expects(AccountNo("123-456")).returns(
+        .expects(where {(accountNo, tenant) =>
+          accountNo === AccountNo("123-456")
+          tenant === TenantA
+        }).returns(
           Future.successful(
             Seq(
               TransactionDto(

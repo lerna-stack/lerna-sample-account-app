@@ -59,7 +59,7 @@ class ApplicationRoute(
 
     private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       (path("transactions") & get) {
-        val futureRepositoryResponse = readTransactionRepository.getTransactionList(accountNo)
+        val futureRepositoryResponse = readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant)
         val futureResponse =
           futureRepositoryResponse.map(AccountStatementResponse.from(accountNo, _))(system.executionContext)
         onSuccess(futureResponse) { response =>
