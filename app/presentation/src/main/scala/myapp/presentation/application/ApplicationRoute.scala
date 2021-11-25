@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.adapter.query.ReadTransactionRepository
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
@@ -65,7 +65,9 @@ class ApplicationRoute(
           val futureRepositoryResponse =
             readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
           val futureResponse =
-            futureRepositoryResponse.map(AccountStatementResponse.from(accountNo, _))(system.executionContext)
+            futureRepositoryResponse.map((transactionList: Seq[TransactionDto]) =>
+              AccountStatementResponse.from(accountNo, appRequestContext.tenant, transactionList),
+            )(system.executionContext)
           onSuccess(futureResponse) { response =>
             complete(StatusCodes.OK -> response)
           }

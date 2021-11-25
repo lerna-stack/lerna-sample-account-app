@@ -386,6 +386,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         expect(
           responseAs[AccountStatementResponse] === AccountStatementResponse.from(
             AccountNo("123-456"),
+            TenantA,
             Seq(TransactionDto("transactionId", "Deposited", 1000, 10000, 1637285782)),
           ),
         )
@@ -398,6 +399,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         expect(
           responseAs[AccountStatementResponse] === AccountStatementResponse.from(
             AccountNo("123-456"),
+            TenantB,
             Seq(TransactionDto("transactionId", "Withdrew", 1000, 9000, 1637812723)),
           ),
         )
