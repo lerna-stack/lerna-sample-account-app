@@ -343,7 +343,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     "return the account statement of the given account" in {
 
       getTransactionList
-        .expects(where {(accountNo, tenant) =>
+        .expects(where { (accountNo, tenant) =>
           accountNo === AccountNo("123-456")
           tenant === TenantA
         }).returns(

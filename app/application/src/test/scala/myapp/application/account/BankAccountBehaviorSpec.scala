@@ -4,11 +4,11 @@ import akka.actor.typed.ActorRef
 import lerna.akka.entityreplication.typed.testkit.ReplicatedEntityBehaviorTestKit
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
-import myapp.adapter.account.{AccountNo, TransactionId}
+import myapp.adapter.account.{ AccountNo, TransactionId }
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.TenantA
-import org.scalatest.{BeforeAndAfterEach, Inside}
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.{ BeforeAndAfterEach, Inside }
 
 import java.util.UUID
 
@@ -44,43 +44,53 @@ class BankAccountBehaviorSpec
   "A BankAccountBehavior" should {
 
     "increase a balance when it receives Deposit" in {
-      val accountNo = AccountNo("1")
+      val accountNo      = AccountNo("1")
       val transactionId1 = TransactionId("1")
-      val result1        = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, transactionId1, amount = 1000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, transactionId1, amount = 1000, replyTo),
+      )
       result1.eventOfType[Deposited].amount should be(1000)
       result1.state.balance should be(1000)
       result1.replyOfType[DepositSucceeded].balance should be(1000)
 
       val transactionId2 = TransactionId("2")
-      val result2        = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, transactionId2, amount = 2000, replyTo))
+      val result2 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, transactionId2, amount = 2000, replyTo),
+      )
       result2.eventOfType[Deposited].amount should be(2000)
       result2.state.balance should be(3000)
       result2.replyOfType[DepositSucceeded].balance should be(3000)
     }
 
     "reject a Deposit request if the deposited balance will be exceeded the balance max limit" in {
-      val accountNo = AccountNo("1")
+      val accountNo       = AccountNo("1")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val resultOfDepositingMaxAmount =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo),
+        )
       resultOfDepositingMaxAmount.eventOfType[Deposited].amount should be(balanceMaxLimit)
       resultOfDepositingMaxAmount.state.balance should be(balanceMaxLimit)
       resultOfDepositingMaxAmount.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
 
       val resultOfExcessBalance =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("2"), amount = 1, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("2"), amount = 1, replyTo),
+        )
       resultOfExcessBalance.eventOfType[BalanceExceeded]
       resultOfExcessBalance.state.balance should be(balanceMaxLimit)
       resultOfExcessBalance.replyOfType[ExcessBalance]
     }
 
     "reject the second Deposit request with the same transactionId if the first Deposit request fails due to an excess balance" in {
-      val accountNo = AccountNo("1")
+      val accountNo       = AccountNo("1")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val depositingMaxAmountResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo),
+        )
       depositingMaxAmountResult.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
 
       def deposit[T](replyTo: ActorRef[DepositReply]) =
@@ -97,10 +107,12 @@ class BankAccountBehaviorSpec
     }
 
     "not handle a Deposit request with a transactionId that is associated with another command" in {
-      val accountNo = AccountNo("1")
+      val accountNo        = AccountNo("1")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, initialDepositId, amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, initialDepositId, amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val initialWithdrawalId = TransactionId("2")
@@ -109,14 +121,18 @@ class BankAccountBehaviorSpec
       initialWithdrawalResult.replyOfType[WithdrawSucceeded].balance should be(700)
 
       val depositResultWithInvalidId =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, initialWithdrawalId, amount = 400, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, initialWithdrawalId, amount = 400, replyTo),
+        )
       depositResultWithInvalidId.hasNoEvents should be(true)
     }
 
     "decrease a balance when it receives Withdraw" in {
-      val accountNo = AccountNo("1")
+      val accountNo      = AccountNo("1")
       val transactionId1 = TransactionId("1")
-      val result1        = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, transactionId1, amount = 3000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, transactionId1, amount = 3000, replyTo),
+      )
       result1.replyOfType[DepositSucceeded].balance should be(3000)
 
       val transactionId2 = TransactionId("2")
@@ -133,9 +149,11 @@ class BankAccountBehaviorSpec
     }
 
     "reject the request when it receives Withdraw if the balance is less than the request" in {
-      val accountNo = AccountNo("1")
+      val accountNo      = AccountNo("1")
       val transactionId1 = TransactionId("1")
-      val result1        = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, transactionId1, amount = 3000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, transactionId1, amount = 3000, replyTo),
+      )
       result1.replyOfType[DepositSucceeded].balance should be(3000)
 
       val transactionId2 = TransactionId("2")
@@ -146,11 +164,13 @@ class BankAccountBehaviorSpec
     "reject the second Withdraw request with the same transactionId if the first Withdraw request fails due to a short balance" in {
       val accountNo = AccountNo("1")
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       def withdraw[T](replyTo: ActorRef[WithdrawReply]) =
-        Withdraw(accountNo,TransactionId("2"), amount = 2000, replyTo)
+        Withdraw(accountNo, TransactionId("2"), amount = 2000, replyTo)
 
       val firstWithdrawalResult =
         bankAccountTestKit.runCommand[WithdrawReply](withdraw)
@@ -163,10 +183,12 @@ class BankAccountBehaviorSpec
     }
 
     "not handle a Withdraw command with a transactionId that is associated with another command" in {
-      val accountNo = AccountNo("1")
+      val accountNo        = AccountNo("1")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, initialDepositId, amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, initialDepositId, amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val initialWithdrawalId = TransactionId("2")
@@ -180,9 +202,11 @@ class BankAccountBehaviorSpec
     }
 
     "return a current balance when it receives GetBalance" in {
-      val accountNo = AccountNo("1")
+      val accountNo      = AccountNo("1")
       val transactionId1 = TransactionId("1")
-      val result1        = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, transactionId1, amount = 3000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, transactionId1, amount = 3000, replyTo),
+      )
       result1.replyOfType[DepositSucceeded].balance should be(3000)
 
       val result2 = bankAccountTestKit.runCommand[AccountBalance](GetBalance(_))
@@ -206,7 +230,9 @@ class BankAccountBehaviorSpec
     "not decrease a balance even if it receives multiple Withdraw commands with same transactionId" in {
       val accountNo = AccountNo("1")
 
-      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+      )
       result1.replyOfType[DepositSucceeded].balance should be(1000)
 
       def command[T](replyTo: ActorRef[WithdrawReply]) =
@@ -223,9 +249,12 @@ class BankAccountBehaviorSpec
 
     "restore the balance after it restarts" in {
       val accountNo = AccountNo("1")
-      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+      val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+        Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+      )
       result1.replyOfType[DepositSucceeded].balance should be(1000)
-      val result2 = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(accountNo, TransactionId("2"), amount = 500, _))
+      val result2 =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(accountNo, TransactionId("2"), amount = 500, _))
       result2.replyOfType[WithdrawSucceeded].balance should be(500)
 
       bankAccountTestKit.restart()
@@ -236,7 +265,9 @@ class BankAccountBehaviorSpec
       val accountNo = AccountNo("1")
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId     = TransactionId("2")
@@ -268,11 +299,13 @@ class BankAccountBehaviorSpec
     }
 
     "refund the given amount even if the refunded balance is greater than BalanceMaxLimit" in {
-      val accountNo = AccountNo("1")
+      val accountNo       = AccountNo("1")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = balanceMaxLimit, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
 
       val withdrawalId = TransactionId("2")
@@ -281,7 +314,9 @@ class BankAccountBehaviorSpec
       withdrawalResult.replyOfType[WithdrawSucceeded].balance should be(0)
 
       val secondDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("3"), 1, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("3"), 1, replyTo),
+        )
       secondDepositResult.replyOfType[DepositSucceeded].balance should be(1)
 
       val refundId      = TransactionId("4")
@@ -310,7 +345,9 @@ class BankAccountBehaviorSpec
       val accountNo = AccountNo("1")
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId = TransactionId("2")
@@ -344,7 +381,9 @@ class BankAccountBehaviorSpec
       val accountNo = AccountNo("1")
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId     = TransactionId("2")
@@ -375,7 +414,9 @@ class BankAccountBehaviorSpec
       val accountNo = AccountNo("1")
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId     = TransactionId("2")
@@ -413,7 +454,9 @@ class BankAccountBehaviorSpec
       val accountNo = AccountNo("1")
 
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId     = TransactionId("2")
@@ -445,10 +488,12 @@ class BankAccountBehaviorSpec
     }
 
     "reject a Refund command with a transactionId that is already associated with another command" in {
-      val accountNo = AccountNo("1")
+      val accountNo        = AccountNo("1")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
-        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) => Deposit(accountNo, initialDepositId, amount = 1000, replyTo))
+        bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
+          Deposit(accountNo, initialDepositId, amount = 1000, replyTo),
+        )
       initialDepositResult.replyOfType[DepositSucceeded].balance should be(1000)
 
       val withdrawalId     = TransactionId("2")

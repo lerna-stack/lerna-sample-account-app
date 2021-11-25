@@ -5,20 +5,20 @@ import akka.persistence.query.Offset
 import akka.projection.Projection
 import akka.projection.eventsourced.EventEnvelope
 import akka.projection.scaladsl.SourceProvider
-import akka.projection.testkit.scaladsl.{ProjectionTestKit, TestSourceProvider}
+import akka.projection.testkit.scaladsl.{ ProjectionTestKit, TestSourceProvider }
 import akka.stream.scaladsl.Source
 import com.typesafe.config.Config
 import lerna.testkit.airframe.DISessionSupport
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
-import myapp.adapter.account.{AccountNo, TransactionId}
-import myapp.application.account.BankAccountBehavior.{Deposited, DomainEvent, Refunded, Withdrew}
+import myapp.adapter.account.{ AccountNo, TransactionId }
+import myapp.application.account.BankAccountBehavior.{ Deposited, DomainEvent, Refunded, Withdrew }
 import myapp.application.projection.AppEventHandler.BehaviorSetup
-import myapp.readmodel.{JDBCSupport, ReadModeDIDesign}
+import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
 import myapp.utility.tenant.TenantA
-import wvlet.airframe.{Design, newDesign}
+import wvlet.airframe.{ newDesign, Design }
 
 @SuppressWarnings(
   Array(
