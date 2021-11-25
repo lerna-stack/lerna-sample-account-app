@@ -21,26 +21,26 @@ class BankTransactionEventHandler(repository: TransactionRepository)
     implicit val requestContext: AppRequestContext = envelope.event.appRequestContext
 
     envelope.event match {
-      case Deposited(accountNo, transactionId, amount, transactedAt) =>
+      case Deposited(accountNo, transactionId, amount, balance, transactedAt) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId, TransactionEventType.Deposited, accountNo, amount, transactedAt))
+        repository.save(Transaction(transactionId, TransactionEventType.Deposited, accountNo, amount, balance, transactedAt))
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
-      case Withdrew(accountNo, transactionId, amount, transactedAt) =>
+      case Withdrew(accountNo, transactionId, amount, balance, transactedAt) =>
         logger.info("Withdrew(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId, TransactionEventType.Withdrew, accountNo, amount, transactedAt))
+        repository.save(Transaction(transactionId, TransactionEventType.Withdrew, accountNo, amount, balance, transactedAt))
       case BalanceShorted(transactionId) =>
         logger.info("BalanceShorted(transactionId: {})", transactionId)
         DBIO.successful(Done)
-      case Refunded(accountNo, transactionId, withdrawalTransactionId, amount, transactedAt) =>
+      case Refunded(accountNo, transactionId, withdrawalTransactionId, amount, balance, transactedAt) =>
         logger.info(
           "Refunded(transactionId: {}, withdrawalTransactionId: {}, amount: {})",
           transactionId,
           withdrawalTransactionId,
           amount,
         )
-        repository.save(Transaction(transactionId, TransactionEventType.Refunded, accountNo, amount, transactedAt))
+        repository.save(Transaction(transactionId, TransactionEventType.Refunded, accountNo, amount, balance, transactedAt))
       case InvalidRefundRequested(transactionId, withdrawalTransactionId, amount) =>
         logger.info(
           "InvalidRefundRequested(transactionId: {}, withdrawalTransactionId: {}, amount: {}",

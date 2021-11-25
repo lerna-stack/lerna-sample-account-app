@@ -8,5 +8,6 @@ final case class Transaction(
     eventType: TransactionEventType,
     accountNo: AccountNo,
     amount: BigInt,
+    balance: Int,
     transactedAt: Long,
 )

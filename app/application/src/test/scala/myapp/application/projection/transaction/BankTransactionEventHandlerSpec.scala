@@ -61,11 +61,11 @@ class BankTransactionEventHandlerSpec
 
       val accountNo = AccountNo("1")
       val events: Vector[DomainEvent] = Vector[DomainEvent](
-        Deposited(accountNo, TransactionId("id0"), BigInt(100000), 0L),
-        Withdrew(accountNo, TransactionId("id1"), BigInt(5000), 0L),
-        Withdrew(accountNo, TransactionId("id2"), BigInt(10000), 0L),
-        Refunded(accountNo, TransactionId("id3"), TransactionId("id2"), BigInt(2000), 0L),
-        Deposited(accountNo, TransactionId("id4"), BigInt(200000), 0L),
+        Deposited(accountNo, TransactionId("id0"), BigInt(100000), 100000, 0L),
+        Withdrew(accountNo, TransactionId("id1"), BigInt(5000), 95000, 0L),
+        Withdrew(accountNo, TransactionId("id2"), BigInt(10000), 85000, 0L),
+        Refunded(accountNo, TransactionId("id3"), TransactionId("id2"), BigInt(2000), 87000, 0L),
+        Deposited(accountNo, TransactionId("id4"), BigInt(200000), 287000, 0L),
       )
 
       val envelopedEvents: Vector[EventEnvelope[DomainEvent]] = events.zipWithIndex.map {
@@ -75,11 +75,11 @@ class BankTransactionEventHandlerSpec
       val projection: Projection[EventEnvelope[DomainEvent]] = createProjection(envelopedEvents: _*)
 
       val expected = Vector(
-        TransactionStoreRow("id0", "Deposited", "1", 100000, 0L),
-        TransactionStoreRow("id1", "Withdrew", "1", 5000, 0L),
-        TransactionStoreRow("id2", "Withdrew", "1", 10000, 0L),
-        TransactionStoreRow("id3", "Refunded", "1", 2000, 0L),
-        TransactionStoreRow("id4", "Deposited", "1", 200000, 0L),
+        TransactionStoreRow("id0", "Deposited", "1", 100000, 100000, 0L),
+        TransactionStoreRow("id1", "Withdrew", "1", 5000, 95000, 0L),
+        TransactionStoreRow("id2", "Withdrew", "1", 10000, 85000, 0L),
+        TransactionStoreRow("id3", "Refunded", "1", 2000, 87000, 0L),
+        TransactionStoreRow("id4", "Deposited", "1", 200000, 287000, 0L),
       )
 
       projectionTestKit.run(projection) {

@@ -84,16 +84,28 @@ object BankAccountBehavior extends AppTypedActorLogging {
   }
 
   sealed trait DepositDomainEvent extends DomainEvent
-  final case class Deposited(accountNo: AccountNo, transactionId: TransactionId, amount: BigInt, transactedAt: Long)(
-      implicit val appRequestContext: AppRequestContext,
+  final case class Deposited(
+      accountNo: AccountNo,
+      transactionId: TransactionId,
+      amount: BigInt,
+      balance: Int,
+      transactedAt: Long,
+  )(implicit
+      val appRequestContext: AppRequestContext,
   ) extends DepositDomainEvent
   final case class BalanceExceeded(transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
   ) extends DepositDomainEvent
 
   sealed trait WithdrawalDomainEvent extends DomainEvent
-  final case class Withdrew(accountNo: AccountNo, transactionId: TransactionId, amount: BigInt, transactedAt: Long)(
-      implicit val appRequestContext: AppRequestContext,
+  final case class Withdrew(
+      accountNo: AccountNo,
+      transactionId: TransactionId,
+      amount: BigInt,
+      balance: Int,
+      transactedAt: Long,
+  )(implicit
+      val appRequestContext: AppRequestContext,
   ) extends WithdrawalDomainEvent
   final case class BalanceShorted(transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
@@ -105,6 +117,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       transactionId: TransactionId,
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
+      balance: Int,
       transactedAt: Long,
   )(implicit val appRequestContext: AppRequestContext)
       extends RefundDomainEvent
@@ -161,7 +174,13 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   .thenRun(logEvent(event, logger)(_))
                   .thenReply(replyTo)(_ => ExcessBalance())
               } else {
-                val event = Deposited(accountNo, transactionId, amount, ZonedDateTime.now().toEpochSecond)
+                val event = Deposited(
+                  accountNo,
+                  transactionId,
+                  amount,
+                  (amount + balance).toInt,
+                  ZonedDateTime.now().toEpochSecond,
+                )
                 Effect
                   .replicate[DomainEvent, Account](event)
                   .thenRun(logEvent(event, logger)(_))
@@ -187,7 +206,13 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   .thenRun(logEvent(event, logger)(_))
                   .thenReply(replyTo)(_ => ShortBalance())
               } else {
-                val event = Withdrew(accountNo, transactionId, amount, ZonedDateTime.now().toEpochSecond)
+                val event = Withdrew(
+                  accountNo,
+                  transactionId,
+                  amount,
+                  (balance - amount).toInt,
+                  ZonedDateTime.now().toEpochSecond,
+                )
                 Effect
                   .replicate[DomainEvent, Account](event)
                   .thenRun(logEvent(event, logger)(_))
@@ -250,6 +275,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               transactionId,
               withdrawalTransactionId,
               refundAmount,
+              (balance + refundAmount).toInt,
               ZonedDateTime.now().toEpochSecond,
             )
             Effect
@@ -262,11 +288,11 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
     def applyEvent(event: DomainEvent): Account =
       event match {
-        case Deposited(_, transactionId, amount, _)      => deposit(amount).recordEvent(transactionId, event)
+        case Deposited(_, transactionId, amount, _, _)   => deposit(amount).recordEvent(transactionId, event)
         case BalanceExceeded(transactionId)              => recordEvent(transactionId, event)
-        case Withdrew(_, transactionId, amount, _)       => withdraw(amount).recordEvent(transactionId, event)
+        case Withdrew(_, transactionId, amount, _, _)    => withdraw(amount).recordEvent(transactionId, event)
         case BalanceShorted(transactionId)               => recordEvent(transactionId, event)
-        case Refunded(_, transactionId, _, amount, _)    => refund(amount).recordEvent(transactionId, event)
+        case Refunded(_, transactionId, _, amount, _, _) => refund(amount).recordEvent(transactionId, event)
         case InvalidRefundRequested(transactionId, _, _) => recordEvent(transactionId, event)
       }
 

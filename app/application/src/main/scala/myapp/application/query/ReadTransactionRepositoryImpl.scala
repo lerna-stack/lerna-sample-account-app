@@ -25,7 +25,7 @@ final class ReadTransactionRepositoryImpl(
             row.transactionId,
             row.transactionType,
             row.amount,
-            0L,
+            row.balance,
             row.transactedAt,
           ) <> (TransactionDto.tupled, TransactionDto.unapply)
         }).result

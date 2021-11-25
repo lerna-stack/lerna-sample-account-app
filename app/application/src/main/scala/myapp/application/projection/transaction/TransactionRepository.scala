@@ -18,7 +18,8 @@ class TransactionRepositoryImpl(tables: Tables, system: ActorSystem[Nothing]) ex
       transaction.transactionId.value,
       transaction.eventType.toString,
       transaction.accountNo.value,
-      transaction.amount.longValue,
+      transaction.amount.toInt,
+      transaction.balance,
       transaction.transactedAt,
     ))
       .map(_ => Done)
