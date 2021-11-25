@@ -50,8 +50,8 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   ] = accountService.refund(_, _, _, _)(_)
 
   private val readTransactionRepository = diSession.build[ReadTransactionRepository]
-  private val getTransactionList: MockFunction2[AccountNo, AppTenant, Future[Seq[TransactionDto]]] =
-    readTransactionRepository.getTransactionList(_, _)
+  private val getTransactionList: MockFunction4[AccountNo, AppTenant, Int, Int, Future[Seq[TransactionDto]]] =
+    readTransactionRepository.getTransactionList(_, _, _, _)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -343,7 +343,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     "return the account statement of the given account" in {
 
       getTransactionList
-        .expects(where { (accountNo, tenant) =>
+        .expects(where { (accountNo, tenant, _, _) =>
           accountNo === AccountNo("123-456")
           tenant === TenantA
         }).returns(
@@ -360,6 +360,26 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           ),
         )
 
+      getTransactionList
+        .expects(where { (accountNo, tenant, offset, limit) =>
+          accountNo === AccountNo("123-456")
+          tenant === TenantB
+          offset === 10
+          limit === 1
+        }).returns(
+          Future.successful(
+            Seq(
+              TransactionDto(
+                "transactionId",
+                "Withdrew",
+                1000,
+                9000,
+                1637812723,
+              ),
+            ),
+          ),
+        )
+
       import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
       Get("/accounts/123-456/transactions").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         expect(status === StatusCodes.OK)
@@ -367,6 +387,18 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           responseAs[AccountStatementResponse] === AccountStatementResponse.from(
             AccountNo("123-456"),
             Seq(TransactionDto("transactionId", "Deposited", 1000, 10000, 1637285782)),
+          ),
+        )
+      }
+
+      Get("/accounts/123-456/transactions?offset=10&limit=1").withHeaders(
+        tenantHeader(TenantB),
+      ) ~> route.route ~> check {
+        expect(status === StatusCodes.OK)
+        expect(
+          responseAs[AccountStatementResponse] === AccountStatementResponse.from(
+            AccountNo("123-456"),
+            Seq(TransactionDto("transactionId", "Withdrew", 1000, 9000, 1637812723)),
           ),
         )
       }

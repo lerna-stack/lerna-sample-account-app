@@ -6,5 +6,5 @@ import myapp.utility.tenant.AppTenant
 import scala.concurrent.Future
 
 trait ReadTransactionRepository {
-  def getTransactionList(accountNo: AccountNo, tenant: AppTenant): Future[Seq[TransactionDto]]
+  def getTransactionList(accountNo: AccountNo, tenant: AppTenant, offset: Int, limit: Int): Future[Seq[TransactionDto]]
 }

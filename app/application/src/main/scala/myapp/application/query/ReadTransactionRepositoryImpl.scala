@@ -15,11 +15,18 @@ final class ReadTransactionRepositoryImpl(
   import tables._
   import tables.profile.api._
 
-  override def getTransactionList(accountNo: AccountNo, tenant: AppTenant): Future[Seq[TransactionDto]] = {
+  override def getTransactionList(
+      accountNo: AccountNo,
+      tenant: AppTenant,
+      offset: Int,
+      limit: Int,
+  ): Future[Seq[TransactionDto]] = {
     val action: DBIO[Seq[TransactionDto]] =
       TransactionStore
         .filter(_.accountNo === accountNo.value)
         .sortBy(_.transactedAt.asc)
+        .drop(offset)
+        .take(limit)
         .map(row => {
           (
             row.transactionId,

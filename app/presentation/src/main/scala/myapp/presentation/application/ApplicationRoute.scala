@@ -58,13 +58,17 @@ class ApplicationRoute(
     }
 
     private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
-      (path("transactions") & get) {
-        val futureRepositoryResponse = readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant)
-        val futureResponse =
-          futureRepositoryResponse.map(AccountStatementResponse.from(accountNo, _))(system.executionContext)
-        onSuccess(futureResponse) { response =>
-          complete(StatusCodes.OK -> response)
-        }
+      (path("transactions") & get & parameters("offset".as[Int].optional, "limit".as[Int].optional)) {
+        (_offset, _limit) =>
+          val offset = _offset.getOrElse(0)
+          val limit  = _limit.getOrElse(100)
+          val futureRepositoryResponse =
+            readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
+          val futureResponse =
+            futureRepositoryResponse.map(AccountStatementResponse.from(accountNo, _))(system.executionContext)
+          onSuccess(futureResponse) { response =>
+            complete(StatusCodes.OK -> response)
+          }
       }
     }
 
