@@ -23,13 +23,17 @@ class BankTransactionEventHandler(repository: TransactionRepository)
     envelope.event match {
       case Deposited(accountNo, transactionId, amount, balance, transactedAt) =>
         logger.info("Deposited(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId, TransactionEventType.Deposited, accountNo, amount, balance, transactedAt))
+        repository.save(
+          Transaction(transactionId, TransactionEventType.Deposited, accountNo, amount, balance, transactedAt),
+        )
       case BalanceExceeded(transactionId) =>
         logger.info("BalanceExceeded(transactionId: {})", transactionId)
         DBIO.successful(Done)
       case Withdrew(accountNo, transactionId, amount, balance, transactedAt) =>
         logger.info("Withdrew(transactionId: {}, amount: {})", transactionId, amount)
-        repository.save(Transaction(transactionId, TransactionEventType.Withdrew, accountNo, amount, balance, transactedAt))
+        repository.save(
+          Transaction(transactionId, TransactionEventType.Withdrew, accountNo, amount, balance, transactedAt),
+        )
       case BalanceShorted(transactionId) =>
         logger.info("BalanceShorted(transactionId: {})", transactionId)
         DBIO.successful(Done)
@@ -40,7 +44,9 @@ class BankTransactionEventHandler(repository: TransactionRepository)
           withdrawalTransactionId,
           amount,
         )
-        repository.save(Transaction(transactionId, TransactionEventType.Refunded, accountNo, amount, balance, transactedAt))
+        repository.save(
+          Transaction(transactionId, TransactionEventType.Refunded, accountNo, amount, balance, transactedAt),
+        )
       case InvalidRefundRequested(transactionId, withdrawalTransactionId, amount) =>
         logger.info(
           "InvalidRefundRequested(transactionId: {}, withdrawalTransactionId: {}, amount: {}",
