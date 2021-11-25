@@ -27,7 +27,7 @@ final class ReadTransactionRepositoryImpl(
             row.amount,
             row.balance,
             row.transactedAt,
-          ) <> (TransactionDto.tupled, TransactionDto.unapply)
+          ).<>(TransactionDto.tupled, TransactionDto.unapply)
         }).result
 
     jdbcService.db(tenant).run(action)
