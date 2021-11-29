@@ -44,7 +44,7 @@ class BankAccountBehaviorSpec
   "A BankAccountBehavior" should {
 
     "increase a balance when it receives Deposit" in {
-      val accountNo      = AccountNo("1")
+      val accountNo      = AccountNo("test-entity")
       val transactionId1 = TransactionId("1")
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, transactionId1, amount = 1000, replyTo),
@@ -63,7 +63,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject a Deposit request if the deposited balance will be exceeded the balance max limit" in {
-      val accountNo       = AccountNo("1")
+      val accountNo       = AccountNo("test-entity")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val resultOfDepositingMaxAmount =
@@ -84,7 +84,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject the second Deposit request with the same transactionId if the first Deposit request fails due to an excess balance" in {
-      val accountNo       = AccountNo("1")
+      val accountNo       = AccountNo("test-entity")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val depositingMaxAmountResult =
@@ -107,7 +107,7 @@ class BankAccountBehaviorSpec
     }
 
     "not handle a Deposit request with a transactionId that is associated with another command" in {
-      val accountNo        = AccountNo("1")
+      val accountNo        = AccountNo("test-entity")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -128,7 +128,7 @@ class BankAccountBehaviorSpec
     }
 
     "decrease a balance when it receives Withdraw" in {
-      val accountNo      = AccountNo("1")
+      val accountNo      = AccountNo("test-entity")
       val transactionId1 = TransactionId("1")
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, transactionId1, amount = 3000, replyTo),
@@ -149,7 +149,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject the request when it receives Withdraw if the balance is less than the request" in {
-      val accountNo      = AccountNo("1")
+      val accountNo      = AccountNo("test-entity")
       val transactionId1 = TransactionId("1")
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, transactionId1, amount = 3000, replyTo),
@@ -162,7 +162,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject the second Withdraw request with the same transactionId if the first Withdraw request fails due to a short balance" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
           Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
@@ -183,7 +183,7 @@ class BankAccountBehaviorSpec
     }
 
     "not handle a Withdraw command with a transactionId that is associated with another command" in {
-      val accountNo        = AccountNo("1")
+      val accountNo        = AccountNo("test-entity")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -202,7 +202,7 @@ class BankAccountBehaviorSpec
     }
 
     "return a current balance when it receives GetBalance" in {
-      val accountNo      = AccountNo("1")
+      val accountNo      = AccountNo("test-entity")
       val transactionId1 = TransactionId("1")
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, transactionId1, amount = 3000, replyTo),
@@ -216,7 +216,7 @@ class BankAccountBehaviorSpec
     "not increase a balance even if it receives multiple Deposit commands with same transactionId" in {
 
       def command[T](replyTo: ActorRef[DepositReply]) =
-        Deposit(AccountNo("1"), TransactionId("1"), amount = 1000, replyTo)
+        Deposit(AccountNo("test-entity"), TransactionId("1"), amount = 1000, replyTo)
 
       val result1 = bankAccountTestKit.runCommand[DepositReply](command)
       result1.eventOfType[Deposited]
@@ -228,7 +228,7 @@ class BankAccountBehaviorSpec
     }
 
     "not decrease a balance even if it receives multiple Withdraw commands with same transactionId" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
@@ -248,7 +248,7 @@ class BankAccountBehaviorSpec
     }
 
     "restore the balance after it restarts" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
       val result1 = bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
         Deposit(accountNo, TransactionId("1"), amount = 1000, replyTo),
       )
@@ -262,7 +262,7 @@ class BankAccountBehaviorSpec
     }
 
     "refund the given amount when it receives a Refund command" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -299,7 +299,7 @@ class BankAccountBehaviorSpec
     }
 
     "refund the given amount even if the refunded balance is greater than BalanceMaxLimit" in {
-      val accountNo       = AccountNo("1")
+      val accountNo       = AccountNo("test-entity")
       val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
 
       val initialDepositResult =
@@ -342,7 +342,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject a Refund command with a negative amount" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -378,7 +378,7 @@ class BankAccountBehaviorSpec
     }
 
     "not refund the given amount if a second Refund command has the same transactionId as the first command" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -411,7 +411,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject a second Refund command if the second command has the same transactionId but a different withdrawalTransactionId" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -451,7 +451,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject a second Refund command if the second command has the same transactionId but a different amount" in {
-      val accountNo = AccountNo("1")
+      val accountNo = AccountNo("test-entity")
 
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
@@ -488,7 +488,7 @@ class BankAccountBehaviorSpec
     }
 
     "reject a Refund command with a transactionId that is already associated with another command" in {
-      val accountNo        = AccountNo("1")
+      val accountNo        = AccountNo("test-entity")
       val initialDepositId = TransactionId("1")
       val initialDepositResult =
         bankAccountTestKit.runCommand[DepositReply]((replyTo: ActorRef[DepositReply]) =>
