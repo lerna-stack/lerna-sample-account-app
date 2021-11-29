@@ -129,14 +129,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       resentTransactions: ListMap[TransactionId, DomainEvent],
   ) {
 
-    def deposit(amount: BigInt): Account =
-      copy(balance = balance + amount)
-
-    def withdraw(amount: BigInt): Account =
-      copy(balance = balance - amount)
-
-    def refund(amount: BigInt): Account =
-      copy(balance = balance + amount)
+    def withBalance(balance: BigInt): Account = copy(balance = balance)
 
     private[this] val maxResentTransactionSize = 30
 
@@ -279,11 +272,12 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
     def applyEvent(event: DomainEvent): Account =
       event match {
-        case Deposited(_, transactionId, amount, _, _)   => deposit(amount).recordEvent(transactionId, event)
-        case BalanceExceeded(transactionId)              => recordEvent(transactionId, event)
-        case Withdrew(_, transactionId, amount, _, _)    => withdraw(amount).recordEvent(transactionId, event)
-        case BalanceShorted(transactionId)               => recordEvent(transactionId, event)
-        case Refunded(_, transactionId, _, amount, _, _) => refund(amount).recordEvent(transactionId, event)
+        case Deposited(_, transactionId, _, newBalance, _) => withBalance(newBalance).recordEvent(transactionId, event)
+        case BalanceExceeded(transactionId)                => recordEvent(transactionId, event)
+        case Withdrew(_, transactionId, _, newBalance, _)  => withBalance(newBalance).recordEvent(transactionId, event)
+        case BalanceShorted(transactionId)                 => recordEvent(transactionId, event)
+        case Refunded(_, transactionId, _, _, newBalance, _) =>
+          withBalance(newBalance).recordEvent(transactionId, event)
         case InvalidRefundRequested(transactionId, _, _) => recordEvent(transactionId, event)
       }
 
