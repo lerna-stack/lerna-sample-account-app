@@ -376,30 +376,20 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
             ),
           ),
         )
-
-      import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
       Get("/accounts/123-456/transactions").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        val expectResponseBody =
+          """{"accountNo":"123-456","tenant":"tenant-a","transactions":[{"amount":1000,"balance":10000,"transactedAt":1637285782,"transactionId":"transactionId","transactionType":"Deposited"}]}"""
         expect(status === StatusCodes.OK)
-        expect(
-          responseAs[AccountStatementResponse] === AccountStatementResponse.from(
-            AccountNo("123-456"),
-            TenantA,
-            Seq(TransactionDto("transactionId", "Deposited", 1000, 10000, 1637285782)),
-          ),
-        )
+        expect(responseAs[String] === expectResponseBody)
       }
 
       Get("/accounts/123-456/transactions?offset=10&limit=1").withHeaders(
         tenantHeader(TenantB),
       ) ~> route.route ~> check {
+        val expectResponseBody =
+          """{"accountNo":"123-456","tenant":"tenant-b","transactions":[{"amount":1000,"balance":9000,"transactedAt":1637812723,"transactionId":"transactionId","transactionType":"Withdrew"}]}"""
         expect(status === StatusCodes.OK)
-        expect(
-          responseAs[AccountStatementResponse] === AccountStatementResponse.from(
-            AccountNo("123-456"),
-            TenantB,
-            Seq(TransactionDto("transactionId", "Withdrew", 1000, 9000, 1637812723)),
-          ),
-        )
+        expect(responseAs[String] === expectResponseBody)
       }
     }
   }
