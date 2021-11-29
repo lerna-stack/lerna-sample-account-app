@@ -58,10 +58,8 @@ class ApplicationRoute(
     }
 
     private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
-      (path("transactions") & get & parameters("offset".as[Int].optional, "limit".as[Int].optional)) {
-        (_offset, _limit) =>
-          val offset = _offset.getOrElse(0)
-          val limit  = _limit.getOrElse(100)
+      (path("transactions") & get & parameters("offset".as[Int].withDefault(0), "limit".as[Int].withDefault(100))) {
+        (offset, limit) =>
           val futureRepositoryResponse =
             readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
           val futureResponse =
