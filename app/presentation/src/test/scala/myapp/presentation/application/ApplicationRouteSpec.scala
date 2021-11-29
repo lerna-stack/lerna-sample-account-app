@@ -1,7 +1,5 @@
 package myapp.presentation.application
 
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.adapter.ClassicActorSystemOps
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ HttpHeader, StatusCodes }
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
@@ -30,7 +28,6 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   override protected val diDesign: Design = PresentationDIDesign.presentationDesign
     .bind[BankAccountApplication].toInstance(mock[BankAccountApplication])
     .bind[ReadTransactionRepository].toInstance(mock[ReadTransactionRepository])
-    .bind[ActorSystem[Nothing]].toInstance(system.toTyped)
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
 
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]

@@ -1,6 +1,5 @@
 package myapp.presentation.application
 
-import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -12,7 +11,6 @@ import myapp.utility.AppRequestContext
 class ApplicationRoute(
     bankAccountApplication: BankAccountApplication,
     readTransactionRepository: ReadTransactionRepository,
-    system: ActorSystem[Nothing],
 ) {
 
   import ApplicationRoute._
@@ -60,14 +58,16 @@ class ApplicationRoute(
     private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       (path("transactions") & get & parameters("offset".as[Int].withDefault(0), "limit".as[Int].withDefault(100))) {
         (offset, limit) =>
-          val futureRepositoryResponse =
-            readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
-          val futureResponse =
-            futureRepositoryResponse.map((transactionList: Seq[TransactionDto]) =>
-              AccountStatementResponse.from(accountNo, appRequestContext.tenant, transactionList),
-            )(system.executionContext)
-          onSuccess(futureResponse) { response =>
-            complete(StatusCodes.OK -> response)
+          extractExecutionContext { implicit executionContext =>
+            val futureRepositoryResponse =
+              readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
+            val futureResponse =
+              futureRepositoryResponse.map((transactionList: Seq[TransactionDto]) =>
+                AccountStatementResponse.from(accountNo, appRequestContext.tenant, transactionList),
+              )
+            onSuccess(futureResponse) { response =>
+              complete(StatusCodes.OK -> response)
+            }
           }
       }
     }
