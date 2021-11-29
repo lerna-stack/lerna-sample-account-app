@@ -18,7 +18,5 @@ object AccountStatementResponse {
 
   implicit private val transactionJsonFormat: JsonFormat[TransactionDto] = jsonFormat5(TransactionDto)
   implicit val accountStatementJsonFormat: RootJsonFormat[AccountStatementResponse] =
-    jsonFormat3((accountNo: String, tenant: String, transactions: Seq[TransactionDto]) =>
-      AccountStatementResponse.apply(accountNo, tenant, transactions),
-    )
+    jsonFormat3(AccountStatementResponse.apply)
 }
