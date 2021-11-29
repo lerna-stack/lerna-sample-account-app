@@ -1,6 +1,6 @@
 package myapp.application.account
 
-import akka.actor.typed.{ ActorRef, ActorSystem }
+import akka.actor.typed.ActorSystem
 import akka.util.Timeout
 import lerna.akka.entityreplication.typed._
 import lerna.akka.entityreplication.util.AtLeastOnceComplete
@@ -58,12 +58,7 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[DepositResult] =
     AtLeastOnceComplete
-      .askTo(
-        entityRef(accountNo),
-        (replyTo: ActorRef[BankAccountBehavior.DepositReply]) =>
-          BankAccountBehavior.Deposit(accountNo, transactionId, amount, replyTo),
-        retryInterval,
-      )
+      .askTo(entityRef(accountNo), BankAccountBehavior.Deposit(transactionId, amount, _), retryInterval)
       .map {
         case BankAccountBehavior.DepositSucceeded(balance) => DepositResult.Succeeded(balance)
         case BankAccountBehavior.ExcessBalance()           => DepositResult.ExcessBalance
@@ -80,7 +75,7 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[WithdrawalResult] =
     AtLeastOnceComplete
-      .askTo(entityRef(accountNo), BankAccountBehavior.Withdraw(accountNo, transactionId, amount, _), retryInterval)
+      .askTo(entityRef(accountNo), BankAccountBehavior.Withdraw(transactionId, amount, _), retryInterval)
       .map {
         case BankAccountBehavior.WithdrawSucceeded(balance) => WithdrawalResult.Succeeded(balance)
         case BankAccountBehavior.ShortBalance()             => WithdrawalResult.ShortBalance
@@ -97,7 +92,7 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BankAccountApplication.RefundResult] = {
-    val refundCommand = BankAccountBehavior.Refund(accountNo, transactionId, withdrawalTransactionId, amount, _)
+    val refundCommand = BankAccountBehavior.Refund(transactionId, withdrawalTransactionId, amount, _)
     AtLeastOnceComplete
       .askTo(entityRef(accountNo), refundCommand, retryInterval)
       .map {

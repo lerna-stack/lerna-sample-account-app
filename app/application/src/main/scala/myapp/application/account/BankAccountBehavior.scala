@@ -25,23 +25,13 @@ object BankAccountBehavior extends AppTypedActorLogging {
     ReplicatedEntityTypeKey(s"BankAccount-${tenant.id}")
 
   sealed trait Command
-  final case class Deposit(
-      accountNo: AccountNo,
-      transactionId: TransactionId,
-      amount: BigInt,
-      replyTo: ActorRef[DepositReply],
-  )(implicit val appRequestContext: AppRequestContext)
-      extends Command
-  final case class Withdraw(
-      accountNo: AccountNo,
-      transactionId: TransactionId,
-      amount: BigInt,
-      replyTo: ActorRef[WithdrawReply],
-  )(implicit
+  final case class Deposit(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[DepositReply])(implicit
+      val appRequestContext: AppRequestContext,
+  ) extends Command
+  final case class Withdraw(transactionId: TransactionId, amount: BigInt, replyTo: ActorRef[WithdrawReply])(implicit
       val appRequestContext: AppRequestContext,
   ) extends Command
   final case class Refund(
-      accountNo: AccountNo,
       transactionId: TransactionId,
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
@@ -132,6 +122,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
   final case class Account(
+      accountNo: AccountNo,
       balance: BigInt,
       @JsonSerialize(converter = classOf[Account.ResentTransactionsSerializerConverter])
       @JsonDeserialize(converter = classOf[Account.ResentTransactionsDeserializerConverter])
@@ -155,7 +146,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
     @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
     def applyCommand(command: Command, logger: AppLogger): Effect =
       command match {
-        case command @ Deposit(accountNo, transactionId, amount, replyTo) =>
+        case command @ Deposit(transactionId, amount, replyTo) =>
           import command.appRequestContext
           resentTransactions.get(transactionId) match {
             // Receive a known transaction: replies message based on the stored event in recentTransactions
@@ -187,7 +178,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   .thenReply(replyTo)(state => DepositSucceeded(state.balance))
               }
           }
-        case command @ Withdraw(accountNo, transactionId, amount, replyTo) =>
+        case command @ Withdraw(transactionId, amount, replyTo) =>
           import command.appRequestContext
           resentTransactions.get(transactionId) match {
             // Receive a known transaction: replies message based on stored event in resetTransactions
@@ -231,7 +222,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
     private def applyRefundCommand(command: Refund, logger: AppLogger): Effect = {
       import command.appRequestContext
-      val Refund(accountNo, transactionId, withdrawalTransactionId, refundAmount, replyTo) = command
+      val Refund(transactionId, withdrawalTransactionId, refundAmount, replyTo) = command
       resentTransactions.get(transactionId) match {
         case Some(refunded: Refunded) =>
           val isValidCommand = {
@@ -330,7 +321,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       context.setReceiveTimeout(1.minute, ReceiveTimeout())
       ReplicatedEntityBehavior[Command, DomainEvent, Account](
         entityContext,
-        emptyState = Account(BigInt(0), ListMap()),
+        emptyState = Account(AccountNo(entityContext.entityId), BigInt(0), ListMap()),
         commandHandler = (state, cmd) => state.applyCommand(cmd, logger),
         eventHandler = (state, evt) => state.applyEvent(evt),
       ).withStopMessage(Stop())
