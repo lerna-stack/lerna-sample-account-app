@@ -66,6 +66,7 @@ sbt clean test:compile test
   * 口座の残高が0未満になるような出金を行うことはできません。
 * [返金](#返金)
   * 返金によって口座残高が上限を超えることがあります。
+* [入出金明細出力](#入出金明細出力)
 * [送金](#送金)
   * 送金によって送金元口座の残高が不足する場合には送金できません。
   * 送金によって送金先口座の残高が上限を超える場合には送金できません。
@@ -233,6 +234,45 @@ curl \
 
 出金の取引ID の妥当性は、このAPIの利用者が保証する必要があります。
 
+#### 入出金明細出力
+口座に紐づく入出金取引履歴の一覧を出力します。
+
+- method: `GET`
+- path `/accounts/${accountNo}/transactions`
+- (query) parameters
+  - 取引履歴を先頭から何件スキップして取得するか指定する値: `offset` (number)
+    - 指定しない場合はスキップされる件数は0
+  - 取得する取引履歴の最大個数: `limit` (number)
+    - 指定しない場合は最大で100件取得される
+- headers
+  - テナント: `X-Tenant-Id`: `${tenantId}`
+
+リクエスト例:
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'GET' \
+    --url 'http://127.0.0.1:9001/accounts/test33/transactions' \
+    --header 'X-Tenant-Id: tenant-a'
+```
+
+レスポンス例:
+```json
+{
+  "accountNo": "test33",
+  "tenant": "tenant-a",
+  "transactions": [
+    {
+      "amount": 600,
+      "balance": 600,
+      "transactedAt": 1637806463,
+      "transactionId": "string",
+      "transactionType": "Deposited"
+    }
+  ]
+}
+```
 
 ## 送金
 送金元口座から送金先口座に指定金額を送金します。

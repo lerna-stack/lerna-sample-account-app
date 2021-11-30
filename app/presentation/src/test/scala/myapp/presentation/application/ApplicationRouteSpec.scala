@@ -1,7 +1,7 @@
 package myapp.presentation.application
 
-import akka.http.scaladsl.model.{ HttpHeader, StatusCodes }
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ HttpHeader, StatusCodes }
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
@@ -11,7 +11,8 @@ import myapp.adapter.account.BankAccountApplication.{
   RefundResult,
   WithdrawalResult,
 }
-import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
+import myapp.adapter.query.ReadTransactionRepository
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -26,7 +27,7 @@ import scala.concurrent.Future
 class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with MockFactory with DISessionSupport {
   override protected val diDesign: Design = PresentationDIDesign.presentationDesign
     .bind[BankAccountApplication].toInstance(mock[BankAccountApplication])
-
+    .bind[ReadTransactionRepository].toInstance(mock[ReadTransactionRepository])
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
 
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]
@@ -44,6 +45,10 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     AppRequestContext,
     Future[RefundResult],
   ] = accountService.refund(_, _, _, _)(_)
+
+  private val readTransactionRepository = diSession.build[ReadTransactionRepository]
+  private val getTransactionList: MockFunction4[AccountNo, AppTenant, Int, Int, Future[Seq[TransactionDto]]] =
+    readTransactionRepository.getTransactionList(_, _, _, _)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -332,6 +337,61 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return the account statement of the given account" in {
+
+      getTransactionList
+        .expects(where { (accountNo, tenant, _, _) =>
+          accountNo === AccountNo("123-456")
+          tenant === TenantA
+        }).returns(
+          Future.successful(
+            Seq(
+              TransactionDto(
+                "transactionId",
+                "Deposited",
+                1000,
+                10000,
+                1637285782,
+              ),
+            ),
+          ),
+        )
+
+      getTransactionList
+        .expects(where { (accountNo, tenant, offset, limit) =>
+          accountNo === AccountNo("123-456")
+          tenant === TenantB
+          offset === 10
+          limit === 1
+        }).returns(
+          Future.successful(
+            Seq(
+              TransactionDto(
+                "transactionId",
+                "Withdrew",
+                1000,
+                9000,
+                1637812723,
+              ),
+            ),
+          ),
+        )
+      Get("/accounts/123-456/transactions").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        val expectResponseBody =
+          """{"accountNo":"123-456","tenant":"tenant-a","transactions":[{"amount":1000,"balance":10000,"transactedAt":1637285782,"transactionId":"transactionId","transactionType":"Deposited"}]}"""
+        expect(status === StatusCodes.OK)
+        expect(responseAs[String] === expectResponseBody)
+      }
+
+      Get("/accounts/123-456/transactions?offset=10&limit=1").withHeaders(
+        tenantHeader(TenantB),
+      ) ~> route.route ~> check {
+        val expectResponseBody =
+          """{"accountNo":"123-456","tenant":"tenant-b","transactions":[{"amount":1000,"balance":9000,"transactedAt":1637812723,"transactionId":"transactionId","transactionType":"Withdrew"}]}"""
+        expect(status === StatusCodes.OK)
+        expect(responseAs[String] === expectResponseBody)
+      }
+    }
   }
 
 }

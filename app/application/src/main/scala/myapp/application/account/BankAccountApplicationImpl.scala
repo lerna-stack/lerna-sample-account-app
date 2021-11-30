@@ -5,7 +5,6 @@ import akka.util.Timeout
 import lerna.akka.entityreplication.typed._
 import lerna.akka.entityreplication.util.AtLeastOnceComplete
 import lerna.log.AppLogging
-
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
