@@ -47,12 +47,14 @@ class BankAccountBehaviorSpec
       val transactionId1 = TransactionId("1")
       val result1        = bankAccountTestKit.runCommand[DepositReply](Deposit(transactionId1, amount = 1000, _))
       result1.eventOfType[Deposited].amount should be(1000)
+      result1.eventOfType[Deposited].balance should be(1000)
       result1.state.balance should be(1000)
       result1.replyOfType[DepositSucceeded].balance should be(1000)
 
       val transactionId2 = TransactionId("2")
       val result2        = bankAccountTestKit.runCommand[DepositReply](Deposit(transactionId2, amount = 2000, _))
       result2.eventOfType[Deposited].amount should be(2000)
+      result2.eventOfType[Deposited].balance should be(3000)
       result2.state.balance should be(3000)
       result2.replyOfType[DepositSucceeded].balance should be(3000)
     }
@@ -63,6 +65,7 @@ class BankAccountBehaviorSpec
       val resultOfDepositingMaxAmount =
         bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = balanceMaxLimit, _))
       resultOfDepositingMaxAmount.eventOfType[Deposited].amount should be(balanceMaxLimit)
+      resultOfDepositingMaxAmount.eventOfType[Deposited].balance should be(balanceMaxLimit)
       resultOfDepositingMaxAmount.state.balance should be(balanceMaxLimit)
       resultOfDepositingMaxAmount.replyOfType[DepositSucceeded].balance should be(balanceMaxLimit)
 
@@ -117,12 +120,14 @@ class BankAccountBehaviorSpec
       val transactionId2 = TransactionId("2")
       val result2        = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(transactionId2, amount = 1000, _))
       result2.eventOfType[Withdrew].amount should be(1000)
+      result2.eventOfType[Withdrew].balance should be(2000)
       result2.state.balance should be(2000)
       result2.replyOfType[WithdrawSucceeded].balance should be(2000)
 
       val transactionId3 = TransactionId("3")
       val result3        = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(transactionId3, amount = 2000, _))
       result3.eventOfType[Withdrew].amount should be(2000)
+      result3.eventOfType[Withdrew].balance should be(0)
       result3.state.balance should be(0)
       result3.replyOfType[WithdrawSucceeded].balance should be(0)
     }
@@ -244,6 +249,7 @@ class BankAccountBehaviorSpec
         event.withdrawalTransactionId should be(withdrawalId)
         event.appRequestContext should be(refundContext)
         event.amount should be(refundAmount)
+        event.balance should be(1000)
         event
       }
       inside(refundResult.state) { account =>
@@ -276,14 +282,15 @@ class BankAccountBehaviorSpec
         bankAccountTestKit.runCommand[RefundReply](
           Refund(refundId, withdrawalId, balanceMaxLimit, _)(refundContext),
         )
+      val expectedBalance = balanceMaxLimit + 1
       val refunded = inside(refundResult.eventOfType[Refunded]) { event =>
         event.transactionId should be(refundId)
         event.withdrawalTransactionId should be(withdrawalId)
         event.appRequestContext should be(refundContext)
         event.amount should be(balanceMaxLimit)
+        event.balance should be(expectedBalance)
         event
       }
-      val expectedBalance = balanceMaxLimit + 1
       inside(refundResult.state) { account =>
         account.balance should be(expectedBalance)
         account.resentTransactions(refundId) should be(refunded)
