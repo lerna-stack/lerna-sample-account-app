@@ -78,7 +78,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: BigInt,
-      balance: Int,
+      balance: BigInt,
       transactedAt: Long,
   )(implicit
       val appRequestContext: AppRequestContext,
@@ -92,7 +92,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       accountNo: AccountNo,
       transactionId: TransactionId,
       amount: BigInt,
-      balance: Int,
+      balance: BigInt,
       transactedAt: Long,
   )(implicit
       val appRequestContext: AppRequestContext,
@@ -107,7 +107,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
       transactionId: TransactionId,
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
-      balance: Int,
+      balance: BigInt,
       transactedAt: Long,
   )(implicit val appRequestContext: AppRequestContext)
       extends RefundDomainEvent
@@ -162,7 +162,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   accountNo,
                   transactionId,
                   amount,
-                  (amount + balance).toInt,
+                  amount + balance,
                   ZonedDateTime.now().toEpochSecond,
                 )
                 Effect
@@ -194,7 +194,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
                   accountNo,
                   transactionId,
                   amount,
-                  (balance - amount).toInt,
+                  balance - amount,
                   ZonedDateTime.now().toEpochSecond,
                 )
                 Effect
@@ -259,7 +259,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               transactionId,
               withdrawalTransactionId,
               refundAmount,
-              (balance + refundAmount).toInt,
+              balance + refundAmount,
               ZonedDateTime.now().toEpochSecond,
             )
             Effect

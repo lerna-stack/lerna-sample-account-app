@@ -155,25 +155,24 @@ trait Tables {
     *  @param transactionId Database column transaction_id SqlType(VARCHAR), PrimaryKey, Length(255,true)
     *  @param transactionType Database column transaction_type SqlType(CHAR), Length(16,false)
     *  @param accountNo Database column account_no SqlType(VARCHAR), Length(255,true)
-    *  @param amount Database column amount SqlType(INT)
-    *  @param balance Database column balance SqlType(INT)
+    *  @param amount Database column amount SqlType(BIGINT)
+    *  @param balance Database column balance SqlType(BIGINT)
     *  @param transactedAt Database column transacted_at SqlType(BIGINT)
     */
   case class TransactionStoreRow(
       transactionId: String,
       transactionType: String,
       accountNo: String,
-      amount: Int,
-      balance: Int,
+      amount: Long,
+      balance: Long,
       transactedAt: Long,
   )
 
   /** GetResult implicit for fetching TransactionStoreRow objects using plain SQL queries */
   implicit
-  def GetResultTransactionStoreRow(implicit e0: GR[String], e1: GR[Int], e2: GR[Long]): GR[TransactionStoreRow] = GR {
-    prs =>
-      import prs._
-      TransactionStoreRow.tupled((<<[String], <<[String], <<[String], <<[Int], <<[Int], <<[Long]))
+  def GetResultTransactionStoreRow(implicit e0: GR[String], e1: GR[Long]): GR[TransactionStoreRow] = GR { prs =>
+    import prs._
+    TransactionStoreRow.tupled((<<[String], <<[String], <<[String], <<[Long], <<[Long], <<[Long]))
   }
 
   /** Table description of table transaction_store. Objects of this class serve as prototypes for rows in queries. */
@@ -213,11 +212,11 @@ trait Tables {
     /** Database column account_no SqlType(VARCHAR), Length(255,true) */
     val accountNo: Rep[String] = column[String]("account_no", O.Length(255, varying = true))
 
-    /** Database column amount SqlType(INT) */
-    val amount: Rep[Int] = column[Int]("amount")
+    /** Database column amount SqlType(BIGINT) */
+    val amount: Rep[Long] = column[Long]("amount")
 
-    /** Database column balance SqlType(INT) */
-    val balance: Rep[Int] = column[Int]("balance")
+    /** Database column balance SqlType(BIGINT) */
+    val balance: Rep[Long] = column[Long]("balance")
 
     /** Database column transacted_at SqlType(BIGINT) */
     val transactedAt: Rep[Long] = column[Long]("transacted_at")
