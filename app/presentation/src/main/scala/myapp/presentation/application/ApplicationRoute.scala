@@ -5,7 +5,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, ReadTransactionRepository }
+import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
+import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, ReadTransactionRepository }
 import myapp.presentation.application.protocol.CommentRequestBody
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
@@ -13,7 +14,8 @@ import myapp.utility.AppRequestContext
 class ApplicationRoute(
     bankAccountApplication: BankAccountApplication,
     readTransactionRepository: ReadTransactionRepository,
-    commentService: CreateOrUpdateCommentService,
+    createOrUpdateCommentService: CreateOrUpdateCommentService,
+    deleteCommentService: DeleteCommentService,
 ) {
 
   import ApplicationRoute._
@@ -35,7 +37,7 @@ class ApplicationRoute(
 
     def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       concat(
-        createOrUpdateCommentRoute(accountNo),
+        commentRoute(accountNo),
         getAccountStatementRoute(accountNo),
         fetchBalanceRoute(accountNo),
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
@@ -126,26 +128,35 @@ class ApplicationRoute(
       }
     }
 
-    private def createOrUpdateCommentRoute(
+    private def commentRoute(
         accountNo: AccountNo,
     )(implicit appRequestContext: AppRequestContext): Route = {
       import CommentRequestBody._
       path("transactions" / Segment.map(TransactionId) / "comment") { transactionId =>
-        put {
-          entity(as[CommentRequestBody]) { requestBody =>
-            val result = commentService.createOrUpdate(
-              accountNo,
-              transactionId,
-              requestBody.comment,
-              appRequestContext.tenant,
-            )
-            onSuccess(result) {
-              case CreateOrUpdateCommentResult.Created             => complete(StatusCodes.Created)
-              case CreateOrUpdateCommentResult.Updated             => complete(StatusCodes.NoContent)
-              case CreateOrUpdateCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+        concat(
+          put {
+            entity(as[CommentRequestBody]) { requestBody =>
+              val result = createOrUpdateCommentService.createOrUpdate(
+                accountNo,
+                transactionId,
+                requestBody.comment,
+                appRequestContext.tenant,
+              )
+              onSuccess(result) {
+                case CreateOrUpdateCommentResult.Created             => complete(StatusCodes.Created)
+                case CreateOrUpdateCommentResult.Updated             => complete(StatusCodes.NoContent)
+                case CreateOrUpdateCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+              }
             }
-          }
-        }
+          },
+          delete {
+            val result = deleteCommentService.delete(accountNo, transactionId, appRequestContext.tenant)
+            onSuccess(result) {
+              case DeleteCommentResult.Deleted             => complete(StatusCodes.NoContent)
+              case DeleteCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+            }
+          },
+        )
       }
     }
   }

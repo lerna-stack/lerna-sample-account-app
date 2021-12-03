@@ -18,19 +18,24 @@ class TransactionRepositoryImpl(tables: Tables, system: ActorSystem[Nothing]) ex
   import tables._
   import tables.profile.api._
 
-  override def save(transaction: Transaction): slick.dbio.DBIO[Done] = (transaction.comment match {
-    case None =>
-      TransactionStore += TransactionStoreRow(
-        transaction.transactionId.value,
-        transaction.eventType.toString,
-        transaction.accountNo.value,
-        transaction.amount.longValue,
-        transaction.balance.longValue,
-        transaction.transactedAt,
+  override def save(transaction: Transaction): slick.dbio.DBIO[Done] =
+    for {
+      _ <- TransactionStore.insertOrUpdate(
+        TransactionStoreRow(
+          transaction.transactionId.value,
+          transaction.eventType.toString,
+          transaction.accountNo.value,
+          transaction.amount.longValue,
+          transaction.balance.longValue,
+          transaction.transactedAt,
+        ),
       )
-    case Some(comment) =>
-      CommentStore.insertOrUpdate(CommentStoreRow(transaction.transactionId.value, comment.value))
-  }).map(_ => Done)
+      _ <- transaction.comment match {
+        case None => CommentStore.filter(_.commentId === transaction.transactionId.value).delete
+        case Some(comment) =>
+          CommentStore.insertOrUpdate(CommentStoreRow(transaction.transactionId.value, comment.value))
+      }
+    } yield Done
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   override def findById(transactionId: TransactionId): slick.dbio.DBIO[Option[Transaction]] = {

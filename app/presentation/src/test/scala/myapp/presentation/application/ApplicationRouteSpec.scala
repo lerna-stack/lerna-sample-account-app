@@ -14,7 +14,8 @@ import myapp.adapter.account.BankAccountApplication.{
 }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, ReadTransactionRepository }
+import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
+import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, ReadTransactionRepository }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -31,6 +32,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     .bind[BankAccountApplication].toInstance(mock[BankAccountApplication])
     .bind[ReadTransactionRepository].toInstance(mock[ReadTransactionRepository])
     .bind[CreateOrUpdateCommentService].toInstance(mock[CreateOrUpdateCommentService])
+    .bind[DeleteCommentService].toInstance(mock[DeleteCommentService])
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
 
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]
@@ -53,10 +55,14 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   private val getTransactionList: MockFunction4[AccountNo, AppTenant, Int, Int, Future[Seq[TransactionDto]]] =
     readTransactionRepository.getTransactionList(_, _, _, _)
 
-  private val commentService = diSession.build[CreateOrUpdateCommentService]
+  private val createOrUpdateCommentService = diSession.build[CreateOrUpdateCommentService]
   private val createOrUpdateComment
       : MockFunction4[AccountNo, TransactionId, Comment, AppTenant, Future[CreateOrUpdateCommentResult]] =
-    commentService.createOrUpdate(_, _, _, _)
+    createOrUpdateCommentService.createOrUpdate(_, _, _, _)
+
+  private val deleteCommentService = diSession.build[DeleteCommentService]
+  private val deleteComment: MockFunction3[AccountNo, TransactionId, AppTenant, Future[DeleteCommentResult]] =
+    deleteCommentService.delete(_, _, _)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -448,6 +454,36 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         )
       Put("/accounts/123-456/transactions/1638500554/comment")
         .withEntity(ContentTypes.`application/json`, """{"comment":"test1"}""")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.NotFound)
+      }
+    }
+
+    "delete comment of the given transaction and return NoContent" in {
+      deleteComment
+        .expects(where { (accountNo, transactionId, tenant) =>
+          accountNo === AccountNo("123-456")
+          transactionId === TransactionId("1638337752")
+          tenant === TenantA
+        }).returns(
+          Future.successful(DeleteCommentResult.Deleted),
+        )
+      Delete("/accounts/123-456/transactions/1638500554/comment")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.NoContent)
+      }
+    }
+
+    "return NotFound, if the given transaction which is required comment delete is not found" in {
+      deleteComment
+        .expects(where { (accountNo, transactionId, tenant) =>
+          accountNo === AccountNo("123-456")
+          transactionId === TransactionId("1638337752")
+          tenant === TenantA
+        }).returns(
+          Future.successful(DeleteCommentResult.TransactionNotFound),
+        )
+      Delete("/accounts/123-456/transactions/1638500554/comment")
         .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         expect(status === StatusCodes.NotFound)
       }
