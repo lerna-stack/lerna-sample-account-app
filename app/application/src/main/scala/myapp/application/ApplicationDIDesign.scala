@@ -1,10 +1,10 @@
 package myapp.application
 
 import myapp.adapter.account.{ BankAccountApplication, RemittanceApplication }
-import myapp.adapter.query.ReadTransactionRepository
+import myapp.adapter.query.{ CreateOrUpdateCommentService, ReadTransactionRepository }
 import myapp.application.account.{ BankAccountApplicationImpl, RemittanceApplicationImpl }
 import myapp.application.projection.transaction.{ TransactionRepository, TransactionRepositoryImpl }
-import myapp.application.query.ReadTransactionRepositoryImpl
+import myapp.application.query.{ CreateOrUpdateCommentServiceImpl, ReadTransactionRepositoryImpl }
 import wvlet.airframe.{ newDesign, Design }
 
 /** Application プロジェクト内のコンポーネントの [[wvlet.airframe.Design]] を定義する
@@ -22,6 +22,7 @@ object ApplicationDIDesign {
   val applicationDesign: Design = newDesign
     .bind[TransactionRepository].to[TransactionRepositoryImpl]
     .bind[ReadTransactionRepository].to[ReadTransactionRepositoryImpl]
+    .bind[CreateOrUpdateCommentService].to[CreateOrUpdateCommentServiceImpl]
     .bind[BankAccountApplication].to[BankAccountApplicationImpl]
     .bind[RemittanceApplication].to[RemittanceApplicationImpl]
 }

@@ -19,7 +19,7 @@ trait Tables {
 
   /** DDL for all tables. Call .create to execute. */
   lazy val schema: profile.SchemaDescription =
-    AkkaProjectionOffsetStore.schema ++ DepositStore.schema ++ TransactionStore.schema
+    AkkaProjectionOffsetStore.schema ++ CommentStore.schema ++ DepositStore.schema ++ TransactionStore.schema
   @deprecated("Use .schema instead of .ddl", "3.0")
   def ddl = schema
 
@@ -107,6 +107,46 @@ trait Tables {
 
   /** Collection-like TableQuery object for table AkkaProjectionOffsetStore */
   lazy val AkkaProjectionOffsetStore = new TableQuery(tag => new AkkaProjectionOffsetStore(tag))
+
+  /** Entity class storing rows of table CommentStore
+    *  @param commentId Database column comment_id SqlType(VARCHAR), PrimaryKey, Length(255,true)
+    *  @param comment Database column comment SqlType(VARCHAR), Length(255,true)
+    */
+  case class CommentStoreRow(commentId: String, comment: String)
+
+  /** GetResult implicit for fetching CommentStoreRow objects using plain SQL queries */
+  implicit def GetResultCommentStoreRow(implicit e0: GR[String]): GR[CommentStoreRow] = GR { prs =>
+    import prs._
+    CommentStoreRow.tupled((<<[String], <<[String]))
+  }
+
+  /** Table description of table comment_store. Objects of this class serve as prototypes for rows in queries. */
+
+  class CommentStore(_tableTag: Tag) extends profile.api.Table[CommentStoreRow](_tableTag, None, "comment_store") {
+    def * = (commentId, comment) <> (CommentStoreRow.tupled, CommentStoreRow.unapply)
+
+    /** Maps whole row to an option. Useful for outer joins. */
+    def ? = ((Rep.Some(commentId), Rep.Some(comment))).shaped.<>(
+      { r => import r._; _1.map(_ => CommentStoreRow.tupled((_1.get, _2.get))) },
+      (_: Any) => throw new Exception("Inserting into ? projection not supported."),
+    )
+
+    /** Database column comment_id SqlType(VARCHAR), PrimaryKey, Length(255,true) */
+    val commentId: Rep[String] = column[String]("comment_id", O.PrimaryKey, O.Length(255, varying = true))
+
+    /** Database column comment SqlType(VARCHAR), Length(255,true) */
+    val comment: Rep[String] = column[String]("comment", O.Length(255, varying = true))
+
+    /** Foreign key referencing TransactionStore (database name comment_store_ibfk_1) */
+    lazy val transactionStoreFk = foreignKey("comment_store_ibfk_1", commentId, TransactionStore)(
+      r => r.transactionId,
+      onUpdate = ForeignKeyAction.Restrict,
+      onDelete = ForeignKeyAction.Restrict,
+    )
+  }
+
+  /** Collection-like TableQuery object for table CommentStore */
+  lazy val CommentStore = new TableQuery(tag => new CommentStore(tag))
 
   /** Entity class storing rows of table DepositStore
     *  @param depositId Database column deposit_id SqlType(BIGINT), AutoInc, PrimaryKey

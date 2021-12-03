@@ -1,10 +1,11 @@
 package myapp.presentation.application
 
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ HttpHeader, StatusCodes }
+import akka.http.scaladsl.model.{ ContentTypes, HttpHeader, StatusCodes }
 import akka.http.scaladsl.server.{ MalformedHeaderRejection, MissingHeaderRejection }
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import lerna.testkit.airframe.DISessionSupport
+import myapp.adapter.Comment
 import myapp.adapter.account.BankAccountApplication.{
   DepositResult,
   FetchBalanceResult,
@@ -12,7 +13,8 @@ import myapp.adapter.account.BankAccountApplication.{
   WithdrawalResult,
 }
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
-import myapp.adapter.query.ReadTransactionRepository
+import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
+import myapp.adapter.query.{ CreateOrUpdateCommentService, ReadTransactionRepository }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -28,6 +30,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   override protected val diDesign: Design = PresentationDIDesign.presentationDesign
     .bind[BankAccountApplication].toInstance(mock[BankAccountApplication])
     .bind[ReadTransactionRepository].toInstance(mock[ReadTransactionRepository])
+    .bind[CreateOrUpdateCommentService].toInstance(mock[CreateOrUpdateCommentService])
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
 
   private val accountService: BankAccountApplication = diSession.build[BankAccountApplication]
@@ -49,6 +52,11 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
   private val readTransactionRepository = diSession.build[ReadTransactionRepository]
   private val getTransactionList: MockFunction4[AccountNo, AppTenant, Int, Int, Future[Seq[TransactionDto]]] =
     readTransactionRepository.getTransactionList(_, _, _, _)
+
+  private val commentService = diSession.build[CreateOrUpdateCommentService]
+  private val createOrUpdateComment
+      : MockFunction4[AccountNo, TransactionId, Comment, AppTenant, Future[CreateOrUpdateCommentResult]] =
+    commentService.createOrUpdate(_, _, _, _)
 
   private val invalidTenant = new AppTenant {
     override def id: String = "invalid"
@@ -390,6 +398,58 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
           """{"accountNo":"123-456","tenant":"tenant-b","transactions":[{"amount":1000,"balance":9000,"transactedAt":1637812723,"transactionId":"transactionId","transactionType":"Withdrew"}]}"""
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === expectResponseBody)
+      }
+    }
+
+    "create or update the comment of the given transaction" in {
+
+      createOrUpdateComment
+        .expects(where { (accountNo, transactionId, comment, tenant) =>
+          accountNo === AccountNo("123-456")
+          transactionId === TransactionId("1638337752")
+          comment === Comment("test1")
+          tenant === TenantA
+        }).returns(
+          Future.successful(CreateOrUpdateCommentResult.Created),
+        )
+
+      createOrUpdateComment
+        .expects(where { (accountNo, transactionId, comment, tenant) =>
+          accountNo === AccountNo("123-456")
+          transactionId === TransactionId("1638337752")
+          comment === Comment("test2")
+          tenant === TenantA
+        }).returns(
+          Future.successful(CreateOrUpdateCommentResult.Updated),
+        )
+
+      Put("/accounts/123-456/transactions/1638337752/comment")
+        .withEntity(ContentTypes.`application/json`, """{"comment":"test1"}""")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.Created)
+      }
+
+      Put("/accounts/123-456/transactions/1638337752/comment")
+        .withEntity(ContentTypes.`application/json`, """{"comment":"test2"}""")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.NoContent)
+      }
+    }
+
+    "return NotFound, if the given transaction which is required comment update is not found" in {
+      createOrUpdateComment
+        .expects(where { (accountNo, transactionId, comment, tenant) =>
+          accountNo === AccountNo("123-456")
+          transactionId === TransactionId("1638337752")
+          comment === Comment("test1")
+          tenant === TenantA
+        }).returns(
+          Future.successful(CreateOrUpdateCommentResult.TransactionNotFound),
+        )
+      Put("/accounts/123-456/transactions/1638500554/comment")
+        .withEntity(ContentTypes.`application/json`, """{"comment":"test1"}""")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.NotFound)
       }
     }
   }

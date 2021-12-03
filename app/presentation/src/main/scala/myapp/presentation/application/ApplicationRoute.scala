@@ -4,13 +4,16 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
-import myapp.adapter.query.ReadTransactionRepository
+import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
+import myapp.adapter.query.{ CreateOrUpdateCommentService, ReadTransactionRepository }
+import myapp.presentation.application.protocol.CommentRequestBody
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
 
 class ApplicationRoute(
     bankAccountApplication: BankAccountApplication,
     readTransactionRepository: ReadTransactionRepository,
+    commentService: CreateOrUpdateCommentService,
 ) {
 
   import ApplicationRoute._
@@ -32,6 +35,7 @@ class ApplicationRoute(
 
     def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       concat(
+        createOrUpdateCommentRoute(accountNo),
         getAccountStatementRoute(accountNo),
         fetchBalanceRoute(accountNo),
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
@@ -122,6 +126,28 @@ class ApplicationRoute(
       }
     }
 
+    private def createOrUpdateCommentRoute(
+        accountNo: AccountNo,
+    )(implicit appRequestContext: AppRequestContext): Route = {
+      import CommentRequestBody._
+      path("transactions" / Segment.map(TransactionId) / "comment") { transactionId =>
+        put {
+          entity(as[CommentRequestBody]) { requestBody =>
+            val result = commentService.createOrUpdate(
+              accountNo,
+              transactionId,
+              requestBody.comment,
+              appRequestContext.tenant,
+            )
+            onSuccess(result) {
+              case CreateOrUpdateCommentResult.Created             => complete(StatusCodes.Created)
+              case CreateOrUpdateCommentResult.Updated             => complete(StatusCodes.NoContent)
+              case CreateOrUpdateCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+            }
+          }
+        }
+      }
+    }
   }
 
 }
