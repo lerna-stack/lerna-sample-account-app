@@ -366,6 +366,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
                 1000,
                 10000,
                 1637285782,
+                "test comment 1",
               ),
             ),
           ),
@@ -386,13 +387,14 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
                 1000,
                 9000,
                 1637812723,
+                "test comment 2",
               ),
             ),
           ),
         )
       Get("/accounts/123-456/transactions").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         val expectResponseBody =
-          """{"accountNo":"123-456","tenant":"tenant-a","transactions":[{"amount":1000,"balance":10000,"transactedAt":1637285782,"transactionId":"transactionId","transactionType":"Deposited"}]}"""
+          """{"accountNo":"123-456","tenant":"tenant-a","transactions":[{"amount":1000,"balance":10000,"comment":"test comment 1","transactedAt":1637285782,"transactionId":"transactionId","transactionType":"Deposited"}]}"""
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === expectResponseBody)
       }
@@ -401,7 +403,7 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         tenantHeader(TenantB),
       ) ~> route.route ~> check {
         val expectResponseBody =
-          """{"accountNo":"123-456","tenant":"tenant-b","transactions":[{"amount":1000,"balance":9000,"transactedAt":1637812723,"transactionId":"transactionId","transactionType":"Withdrew"}]}"""
+          """{"accountNo":"123-456","tenant":"tenant-b","transactions":[{"amount":1000,"balance":9000,"comment":"test comment 2","transactedAt":1637812723,"transactionId":"transactionId","transactionType":"Withdrew"}]}"""
         expect(status === StatusCodes.OK)
         expect(responseAs[String] === expectResponseBody)
       }

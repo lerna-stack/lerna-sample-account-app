@@ -16,7 +16,7 @@ object AccountStatementResponse {
 
   import spray.json.DefaultJsonProtocol._
 
-  implicit private val transactionJsonFormat: JsonFormat[TransactionDto] = jsonFormat5(TransactionDto)
+  implicit private val transactionJsonFormat: JsonFormat[TransactionDto] = jsonFormat6(TransactionDto)
   implicit val accountStatementJsonFormat: RootJsonFormat[AccountStatementResponse] =
     jsonFormat3(AccountStatementResponse.apply)
 }

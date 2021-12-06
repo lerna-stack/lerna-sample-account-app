@@ -6,4 +6,5 @@ final case class TransactionDto(
     amount: Long,
     balance: Long,
     transactedAt: Long,
+    comment: String,
 )

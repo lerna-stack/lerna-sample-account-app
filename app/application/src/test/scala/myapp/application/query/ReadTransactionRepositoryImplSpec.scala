@@ -31,12 +31,18 @@ final class ReadTransactionRepositoryImplSpec
   "get transactions by accountNo" in withJDBC { db =>
     val accountNo = "123-456"
 
-    val rows = Seq(
+    val transactionRows = Seq(
       TransactionStoreRow("0", "Deposited", accountNo, 1000, 1000, 0),
       TransactionStoreRow("1", "Withdrew", accountNo, 100, 900, 1),
       TransactionStoreRow("2", "Refunded", accountNo, 50, 950, 2),
     )
-    db.prepare(TransactionStore ++= rows)
+    db.prepare(TransactionStore ++= transactionRows)
+
+    val commentRows = Seq(
+      CommentStoreRow("0", "comment0"),
+      CommentStoreRow("1", "comment1"),
+    )
+    db.prepare(CommentStore ++= commentRows)
 
     val table = Table(
       ("accountNo", "tenant", "offset", "limit", "expected"),
@@ -46,9 +52,9 @@ final class ReadTransactionRepositoryImplSpec
         0,
         100,
         Seq(
-          TransactionDto("0", "Deposited", 1000, 1000, 0L),
-          TransactionDto("1", "Withdrew", 100, 900, 1L),
-          TransactionDto("2", "Refunded", 50, 950, 2L),
+          TransactionDto("0", "Deposited", 1000, 1000, 0L, "comment0"),
+          TransactionDto("1", "Withdrew", 100, 900, 1L, "comment1"),
+          TransactionDto("2", "Refunded", 50, 950, 2L, ""),
         ),
       ),
       (
@@ -57,7 +63,7 @@ final class ReadTransactionRepositoryImplSpec
         1,
         1,
         Seq(
-          TransactionDto("1", "Withdrew", 100, 900, 1L),
+          TransactionDto("1", "Withdrew", 100, 900, 1L, "comment1"),
         ),
       ),
     )
