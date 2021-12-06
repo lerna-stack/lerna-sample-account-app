@@ -6,14 +6,14 @@ import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
 import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, ReadTransactionRepository }
+import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, GetTransactionListService }
 import myapp.presentation.application.protocol.CommentRequestBody
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
 
 class ApplicationRoute(
     bankAccountApplication: BankAccountApplication,
-    readTransactionRepository: ReadTransactionRepository,
+    getTransactionListService: GetTransactionListService,
     createOrUpdateCommentService: CreateOrUpdateCommentService,
     deleteCommentService: DeleteCommentService,
 ) {
@@ -66,7 +66,7 @@ class ApplicationRoute(
         (offset, limit) =>
           extractExecutionContext { implicit executionContext =>
             val futureRepositoryResponse =
-              readTransactionRepository.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
+              getTransactionListService.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
             val futureResponse =
               futureRepositoryResponse.map((transactionList: Seq[TransactionDto]) =>
                 AccountStatementResponse.from(accountNo, appRequestContext.tenant, transactionList),

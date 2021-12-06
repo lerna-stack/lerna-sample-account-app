@@ -15,7 +15,7 @@ import myapp.adapter.account.BankAccountApplication.{
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
 import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, ReadTransactionRepository }
+import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, GetTransactionListService }
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec
@@ -30,7 +30,7 @@ import scala.concurrent.Future
 class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with MockFactory with DISessionSupport {
   override protected val diDesign: Design = PresentationDIDesign.presentationDesign
     .bind[BankAccountApplication].toInstance(mock[BankAccountApplication])
-    .bind[ReadTransactionRepository].toInstance(mock[ReadTransactionRepository])
+    .bind[GetTransactionListService].toInstance(mock[GetTransactionListService])
     .bind[CreateOrUpdateCommentService].toInstance(mock[CreateOrUpdateCommentService])
     .bind[DeleteCommentService].toInstance(mock[DeleteCommentService])
   val route: ApplicationRoute = diSession.build[ApplicationRoute]
@@ -51,9 +51,9 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     Future[RefundResult],
   ] = accountService.refund(_, _, _, _)(_)
 
-  private val readTransactionRepository = diSession.build[ReadTransactionRepository]
+  private val getTransactionListService = diSession.build[GetTransactionListService]
   private val getTransactionList: MockFunction4[AccountNo, AppTenant, Int, Int, Future[Seq[TransactionDto]]] =
-    readTransactionRepository.getTransactionList(_, _, _, _)
+    getTransactionListService.getTransactionList(_, _, _, _)
 
   private val createOrUpdateCommentService = diSession.build[CreateOrUpdateCommentService]
   private val createOrUpdateComment

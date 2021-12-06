@@ -1,17 +1,17 @@
 package myapp.application.query
 
 import myapp.adapter.account.{ AccountNo, TransactionDto }
-import myapp.adapter.query.ReadTransactionRepository
+import myapp.adapter.query.GetTransactionListService
 import myapp.readmodel.JDBCService
 import myapp.readmodel.schema.Tables
 import myapp.utility.tenant.AppTenant
 
 import scala.concurrent.Future
 
-final class ReadTransactionRepositoryImpl(
+final class GetTransactionListServiceImpl(
     jdbcService: JDBCService,
     tables: Tables,
-) extends ReadTransactionRepository {
+) extends GetTransactionListService {
   import tables._
   import tables.profile.api._
 
