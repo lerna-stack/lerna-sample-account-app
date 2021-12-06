@@ -1,7 +1,7 @@
 package myapp.application.query
 
-import myapp.adapter.account.{ AccountNo, TransactionDto }
-import myapp.adapter.query.GetTransactionListService
+import myapp.adapter.account.AccountNo
+import myapp.adapter.query.{ GetTransactionListService, TransactionDto }
 import myapp.readmodel.JDBCService
 import myapp.readmodel.schema.Tables
 import myapp.utility.tenant.AppTenant

@@ -12,10 +12,15 @@ import myapp.adapter.account.BankAccountApplication.{
   RefundResult,
   WithdrawalResult,
 }
-import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
+import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
 import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, GetTransactionListService }
+import myapp.adapter.query.{
+  CreateOrUpdateCommentService,
+  DeleteCommentService,
+  GetTransactionListService,
+  TransactionDto,
+}
 import myapp.presentation.PresentationDIDesign
 import myapp.utility.AppRequestContext
 import myapp.utility.scalatest.StandardSpec

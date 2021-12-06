@@ -3,10 +3,15 @@ package myapp.presentation.application
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionDto, TransactionId }
+import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
 import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
 import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
-import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, GetTransactionListService }
+import myapp.adapter.query.{
+  CreateOrUpdateCommentService,
+  DeleteCommentService,
+  GetTransactionListService,
+  TransactionDto,
+}
 import myapp.presentation.application.protocol.CommentRequestBody
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext

@@ -3,8 +3,8 @@ package myapp.application.query
 import com.typesafe.config.Config
 import lerna.testkit.airframe.DISessionSupport
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
-import myapp.adapter.account.{ AccountNo, TransactionDto }
-import myapp.adapter.query.GetTransactionListService
+import myapp.adapter.account.AccountNo
+import myapp.adapter.query.{ GetTransactionListService, TransactionDto }
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.scalatest.StandardSpec
 import myapp.utility.tenant.TenantA

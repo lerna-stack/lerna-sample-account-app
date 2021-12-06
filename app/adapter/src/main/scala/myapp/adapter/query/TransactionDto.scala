@@ -1,4 +1,4 @@
-package myapp.adapter.account
+package myapp.adapter.query
 
 final case class TransactionDto(
     transactionId: String,

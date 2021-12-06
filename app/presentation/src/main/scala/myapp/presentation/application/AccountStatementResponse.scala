@@ -1,6 +1,7 @@
 package myapp.presentation.application
 
-import myapp.adapter.account.{ AccountNo, TransactionDto }
+import myapp.adapter.account.AccountNo
+import myapp.adapter.query.TransactionDto
 import myapp.utility.tenant.AppTenant
 import spray.json.{ JsonFormat, RootJsonFormat }
 

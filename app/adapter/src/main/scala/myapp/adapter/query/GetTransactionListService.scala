@@ -1,6 +1,6 @@
 package myapp.adapter.query
 
-import myapp.adapter.account.{ AccountNo, TransactionDto }
+import myapp.adapter.account.AccountNo
 import myapp.utility.tenant.AppTenant
 
 import scala.concurrent.Future
