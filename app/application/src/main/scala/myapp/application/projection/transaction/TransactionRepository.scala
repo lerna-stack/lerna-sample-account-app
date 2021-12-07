@@ -19,7 +19,7 @@ class TransactionRepositoryImpl(tables: Tables, system: ActorSystem[Nothing]) ex
   import tables.profile.api._
 
   override def save(transaction: Transaction): slick.dbio.DBIO[Done] =
-    for {
+    (for {
       _ <- TransactionStore.insertOrUpdate(
         TransactionStoreRow(
           transaction.transactionId.value,
@@ -35,7 +35,7 @@ class TransactionRepositoryImpl(tables: Tables, system: ActorSystem[Nothing]) ex
         case Some(comment) =>
           CommentStore.insertOrUpdate(CommentStoreRow(transaction.transactionId.value, comment.value))
       }
-    } yield Done
+    } yield Done).transactionally
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   override def findById(transactionId: TransactionId): slick.dbio.DBIO[Option[Transaction]] = {
