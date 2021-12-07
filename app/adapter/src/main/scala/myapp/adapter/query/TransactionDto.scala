@@ -1,4 +1,4 @@
-package myapp.adapter.account
+package myapp.adapter.query
 
 final case class TransactionDto(
     transactionId: String,
@@ -6,4 +6,5 @@ final case class TransactionDto(
     amount: Long,
     balance: Long,
     transactedAt: Long,
+    comment: String,
 )

@@ -3,8 +3,8 @@ package myapp.application.query
 import com.typesafe.config.Config
 import lerna.testkit.airframe.DISessionSupport
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
-import myapp.adapter.account.{ AccountNo, TransactionDto }
-import myapp.adapter.query.ReadTransactionRepository
+import myapp.adapter.account.AccountNo
+import myapp.adapter.query.{ GetTransactionListService, TransactionDto }
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
 import myapp.utility.scalatest.StandardSpec
 import myapp.utility.tenant.TenantA
@@ -12,7 +12,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import wvlet.airframe.{ newDesign, Design }
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
-final class ReadTransactionRepositoryImplSpec
+final class GetTransactionListServiceImplSpec
     extends ScalaTestWithTypedActorTestKit
     with StandardSpec
     with TableDrivenPropertyChecks
@@ -22,7 +22,7 @@ final class ReadTransactionRepositoryImplSpec
     .add(ReadModeDIDesign.readModelDDesign)
     .bind[Config].toInstance(testKit.config)
 
-  private val repository: ReadTransactionRepository = diSession.build[ReadTransactionRepositoryImpl]
+  private val repository: GetTransactionListService = diSession.build[GetTransactionListServiceImpl]
 
   import tableSeeds._
   import tables._
@@ -31,12 +31,18 @@ final class ReadTransactionRepositoryImplSpec
   "get transactions by accountNo" in withJDBC { db =>
     val accountNo = "123-456"
 
-    val rows = Seq(
+    val transactionRows = Seq(
       TransactionStoreRow("0", "Deposited", accountNo, 1000, 1000, 0),
       TransactionStoreRow("1", "Withdrew", accountNo, 100, 900, 1),
       TransactionStoreRow("2", "Refunded", accountNo, 50, 950, 2),
     )
-    db.prepare(TransactionStore ++= rows)
+    db.prepare(TransactionStore ++= transactionRows)
+
+    val commentRows = Seq(
+      CommentStoreRow("0", "comment0"),
+      CommentStoreRow("1", "comment1"),
+    )
+    db.prepare(CommentStore ++= commentRows)
 
     val table = Table(
       ("accountNo", "tenant", "offset", "limit", "expected"),
@@ -46,9 +52,9 @@ final class ReadTransactionRepositoryImplSpec
         0,
         100,
         Seq(
-          TransactionDto("0", "Deposited", 1000, 1000, 0L),
-          TransactionDto("1", "Withdrew", 100, 900, 1L),
-          TransactionDto("2", "Refunded", 50, 950, 2L),
+          TransactionDto("0", "Deposited", 1000, 1000, 0L, "comment0"),
+          TransactionDto("1", "Withdrew", 100, 900, 1L, "comment1"),
+          TransactionDto("2", "Refunded", 50, 950, 2L, ""),
         ),
       ),
       (
@@ -57,7 +63,7 @@ final class ReadTransactionRepositoryImplSpec
         1,
         1,
         Seq(
-          TransactionDto("1", "Withdrew", 100, 900, 1L),
+          TransactionDto("1", "Withdrew", 100, 900, 1L, "comment1"),
         ),
       ),
     )

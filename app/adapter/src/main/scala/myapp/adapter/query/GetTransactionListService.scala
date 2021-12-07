@@ -1,10 +1,10 @@
 package myapp.adapter.query
 
-import myapp.adapter.account.{ AccountNo, TransactionDto }
+import myapp.adapter.account.AccountNo
 import myapp.utility.tenant.AppTenant
 
 import scala.concurrent.Future
 
-trait ReadTransactionRepository {
+trait GetTransactionListService {
   def getTransactionList(accountNo: AccountNo, tenant: AppTenant, offset: Int, limit: Int): Future[Seq[TransactionDto]]
 }

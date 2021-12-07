@@ -1,6 +1,7 @@
 package myapp.presentation.application
 
-import myapp.adapter.account.{ AccountNo, TransactionDto }
+import myapp.adapter.account.AccountNo
+import myapp.adapter.query.TransactionDto
 import myapp.utility.tenant.AppTenant
 import spray.json.{ JsonFormat, RootJsonFormat }
 
@@ -16,7 +17,7 @@ object AccountStatementResponse {
 
   import spray.json.DefaultJsonProtocol._
 
-  implicit private val transactionJsonFormat: JsonFormat[TransactionDto] = jsonFormat5(TransactionDto)
+  implicit private val transactionJsonFormat: JsonFormat[TransactionDto] = jsonFormat6(TransactionDto)
   implicit val accountStatementJsonFormat: RootJsonFormat[AccountStatementResponse] =
     jsonFormat3(AccountStatementResponse.apply)
 }
