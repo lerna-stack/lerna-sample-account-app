@@ -5,7 +5,11 @@ import myapp.utility.tenant.{ AppTenant, TenantA }
 
 import scala.concurrent.Future
 
-class JDBCHealthCheckApplication(jdbcService: JDBCService) {
+trait JDBCHealthCheckApplication {
+  def check(): Future[Boolean]
+}
+
+class JDBCHealthCheckApplicationImpl(jdbcService: JDBCService) {
 
   private[this] implicit val tenant: AppTenant = TenantA
 
