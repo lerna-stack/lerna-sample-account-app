@@ -20,7 +20,7 @@ class JDBCHealthCheck(system: ActorSystem) extends (() => Future[Boolean]) {
   override def apply(): Future[Boolean] = {
     for {
       JDBCHealthCheckServiceKey.Listing(listing) <-
-        system.toTyped.receptionist ? (Receptionist.find(JDBCHealthCheckServiceKey, _))
+        system.toTyped.receptionist ? (Receptionist.find[JDBCHealthCheckService.Command](JDBCHealthCheckServiceKey, _))
       jdbcHealthCheckService <- listing.headOption match {
         case Some(found) => Future.successful(found)
         case None        => Future.failed(new IllegalStateException("JDBCHealthCheckService is not ready"))

@@ -1,20 +1,21 @@
 package myapp.entrypoint
 
 import akka.actor.CoordinatedShutdown
-import akka.actor.typed.{ Behavior, PreRestart }
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ Behavior, PreRestart }
 import com.typesafe.config.Config
 import myapp.application.util.healthcheck.JDBCHealthCheckService
-import myapp.entrypoint.Main.{ config, logger, system }
+import myapp.entrypoint.Main.logger
 import wvlet.airframe.Design
 
 import scala.concurrent.Future
 
+@SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
 object AppGuardian {
 
   import lerna.log.SystemComponentLogContext.logContext
 
-  def apply(config: Config): Behavior[Nothing] = Behaviors.setup { context =>
+  def apply(config: Config): Behavior[Nothing] = Behaviors.setup[Nothing] { context =>
     val system     = context.system
     val serverMode = config.getString("myapp.server-mode")
     val design: Design = serverMode match {
@@ -37,7 +38,7 @@ object AppGuardian {
     session.build[MyApp].start()
     context.spawn(session.build[JDBCHealthCheckService].createBehavior(), "JDBCHealthChecker")
 
-    Behaviors.receiveSignal {
+    Behaviors.receiveSignal[Nothing] {
       case (_, PreRestart) =>
         session.shutdown
         Behaviors.same
