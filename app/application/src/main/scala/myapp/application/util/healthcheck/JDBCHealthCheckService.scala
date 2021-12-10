@@ -3,9 +3,8 @@ package myapp.application.util.healthcheck
 import akka.actor.typed.receptionist.{ Receptionist, ServiceKey }
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.actor.typed.{ ActorRef, Behavior }
-import myapp.readmodel.JDBCService
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.{ Failure, Success }
 
 object JDBCHealthCheckService {
 
@@ -27,6 +26,7 @@ object JDBCHealthCheckService {
   private final case object TickTimerKey
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 class JDBCHealthCheckService(
     jdbcHealthCheckApplication: JDBCHealthCheckApplication,
     settings: JDBCHealthCheckServiceSettings,
@@ -51,7 +51,7 @@ class JDBCHealthCheckService(
         case HealthCheckSucceeded() =>
           healthy() // reset
         case HealthCheckFailed(cause) =>
-          val newFailureCount = failureCount - 1
+          val newFailureCount = failureCount + 1
           if (newFailureCount >= settings.unhealthyThreshold) {
             unhealthy()
           } else {
@@ -72,7 +72,7 @@ class JDBCHealthCheckService(
         case Tick =>
           check(context)
         case HealthCheckSucceeded() =>
-          val newSuccessCount = successCount - 1
+          val newSuccessCount = successCount + 1
           if (newSuccessCount >= settings.healthyThreshold) {
             healthy()
           } else {
@@ -86,8 +86,9 @@ class JDBCHealthCheckService(
 
   private[this] def check(context: ActorContext[Command]): Behavior[Command] = {
     context.pipeToSelf(jdbcHealthCheckApplication.check()) {
-      case Success(value) => HealthCheckSucceeded()
-      case Failure(cause) => HealthCheckFailed(cause)
+      case Success(isHealth) if isHealth => HealthCheckSucceeded()
+      case Success(_)                    => HealthCheckFailed(new IllegalStateException("failed to connect DB"))
+      case Failure(cause)                => HealthCheckFailed(cause)
     }
     Behaviors.same
   }
