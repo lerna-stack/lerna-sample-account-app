@@ -1,15 +1,12 @@
 package myapp.entrypoint
 
-import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.Behaviors
 import akka.cluster.Cluster
+import akka.management.scaladsl.AkkaManagement
 import com.typesafe.config.ConfigFactory
 import lerna.log.AppLogging
 import lerna.util.encryption.EncryptionConfig
-import wvlet.airframe._
 
-import scala.concurrent.Future
 import scala.util.Failure
 
 @SuppressWarnings(
@@ -46,4 +43,6 @@ object Main extends App with AppLogging {
   cluster.registerOnMemberUp {
     logger.info("Akka Clusterへの参加完了: {}", cluster.state)
   }
+
+  AkkaManagement(system).start()
 }

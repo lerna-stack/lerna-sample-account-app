@@ -21,6 +21,7 @@ object Dependencies {
     val jackson                  = "2.12.3"
     val wireMock                 = "2.30.1"
     val scalaMock                = "5.1.0"
+    val akkaManagement           = "1.0.10"
   }
 
   object Lerna {
@@ -55,6 +56,10 @@ object Dependencies {
     val http        = "com.typesafe.akka" %% "akka-http"            % Versions.akkaHttp
     val sprayJson   = "com.typesafe.akka" %% "akka-http-spray-json" % Versions.akkaHttp
     val httpTestKit = "com.typesafe.akka" %% "akka-http-testkit"    % Versions.akkaHttp
+  }
+
+  object AkkaManagement {
+    val management = "com.lightbend.akka.management" %% "akka-management" % Versions.akkaManagement
   }
 
   object AkkaPersistenceCassandra {

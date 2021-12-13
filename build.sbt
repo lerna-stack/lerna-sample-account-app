@@ -189,6 +189,7 @@ lazy val `entrypoint` =
       name := "entrypoint",
       libraryDependencies ++= Seq(
         Airframe.airframe,
+        AkkaManagement.management,
         ScalaTest.scalaTest % Test,
         Akka.actorTestKit   % Test,
         Lerna.testkit       % Test,
