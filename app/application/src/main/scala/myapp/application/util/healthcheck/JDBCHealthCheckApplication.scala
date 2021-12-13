@@ -9,13 +9,13 @@ trait JDBCHealthCheckApplication {
   def check(): Future[Boolean]
 }
 
-class JDBCHealthCheckApplicationImpl(jdbcService: JDBCService) {
+class JDBCHealthCheckApplicationImpl(jdbcService: JDBCService) extends JDBCHealthCheckApplication {
 
   private[this] implicit val tenant: AppTenant = TenantA
 
   private[this] val profile = jdbcService.dbConfig.profile
 
-  def check(): Future[Boolean] = {
+  override def check(): Future[Boolean] = {
     import profile.api._
     jdbcService.dbConfig.db.run(sql"SELECT 1".as[Boolean].head)
   }

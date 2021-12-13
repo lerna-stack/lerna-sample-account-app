@@ -2,6 +2,7 @@ package myapp.application
 
 import myapp.adapter.account.{ BankAccountApplication, RemittanceApplication }
 import myapp.application.account.{ BankAccountApplicationImpl, RemittanceApplicationImpl }
+import myapp.application.util.healthcheck.{ JDBCHealthCheckApplication, JDBCHealthCheckApplicationImpl }
 import wvlet.airframe.{ newDesign, Design }
 
 /** Application プロジェクト内のコンポーネントの [[wvlet.airframe.Design]] を定義する
@@ -19,4 +20,5 @@ object ApplicationDIDesign {
   val applicationDesign: Design = newDesign
     .bind[BankAccountApplication].to[BankAccountApplicationImpl]
     .bind[RemittanceApplication].to[RemittanceApplicationImpl]
+    .bind[JDBCHealthCheckApplication].to[JDBCHealthCheckApplicationImpl]
 }
