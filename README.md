@@ -108,6 +108,14 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
 
 ポート番号 `9001` は ユーザ向け機能、  
 ポート番号 `9002` は 管理用機能を定義することを想定しています。
+### ヘルスチェック
+RDBにアクセス可能なことを確認できます。
+詳細は[ヘルスチェック機能](docs/jdbc-health-check/index.md)を参照ください。
+
+RDBのアクセスに成功した場合は`200`、失敗した場合は`500`を返します。
+```shell
+ curl --silent --noproxy "*" http://127.0.0.1:8558/ready
+```
 
 ### Bank Accounts
 #### 残高確認
