@@ -4,10 +4,24 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import myapp.adapter.account.{ AccountNo, BankAccountApplication, TransactionId }
+import myapp.adapter.query.CreateOrUpdateCommentService.CreateOrUpdateCommentResult
+import myapp.adapter.query.DeleteCommentService.DeleteCommentResult
+import myapp.adapter.query.{
+  CreateOrUpdateCommentService,
+  DeleteCommentService,
+  GetTransactionListService,
+  TransactionDto,
+}
+import myapp.presentation.application.protocol.CommentRequestBody
 import myapp.presentation.util.directives.AppRequestContextAndLogging._
 import myapp.utility.AppRequestContext
 
-class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
+class ApplicationRoute(
+    bankAccountApplication: BankAccountApplication,
+    getTransactionListService: GetTransactionListService,
+    createOrUpdateCommentService: CreateOrUpdateCommentService,
+    deleteCommentService: DeleteCommentService,
+) {
 
   import ApplicationRoute._
 
@@ -24,9 +38,12 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
 
   object AccountRoute {
     import BankAccountApplication._
+    import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
     def apply(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
       concat(
+        commentRoute(accountNo),
+        getAccountStatementRoute(accountNo),
         fetchBalanceRoute(accountNo),
         (post & parameters("amount".as[Int], "transactionId".as[TransactionId])) { (amount, transactionId) =>
           concat(
@@ -46,6 +63,23 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
           case FetchBalanceResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
         }
+      }
+    }
+
+    private def getAccountStatementRoute(accountNo: AccountNo)(implicit appRequestContext: AppRequestContext): Route = {
+      (path("transactions") & get & parameters("offset".as[Int].withDefault(0), "limit".as[Int].withDefault(100))) {
+        (offset, limit) =>
+          extractExecutionContext { implicit executionContext =>
+            val futureRepositoryResponse =
+              getTransactionListService.getTransactionList(accountNo, appRequestContext.tenant, offset, limit)
+            val futureResponse =
+              futureRepositoryResponse.map((transactionList: Seq[TransactionDto]) =>
+                AccountStatementResponse.from(accountNo, appRequestContext.tenant, transactionList),
+              )
+            onSuccess(futureResponse) { response =>
+              complete(StatusCodes.OK -> response)
+            }
+          }
       }
     }
 
@@ -99,6 +133,37 @@ class ApplicationRoute(bankAccountApplication: BankAccountApplication) {
       }
     }
 
+    private def commentRoute(
+        accountNo: AccountNo,
+    )(implicit appRequestContext: AppRequestContext): Route = {
+      import CommentRequestBody._
+      path("transactions" / Segment.map(TransactionId) / "comment") { transactionId =>
+        concat(
+          put {
+            entity(as[CommentRequestBody]) { requestBody =>
+              val result = createOrUpdateCommentService.createOrUpdate(
+                accountNo,
+                transactionId,
+                requestBody.comment,
+                appRequestContext.tenant,
+              )
+              onSuccess(result) {
+                case CreateOrUpdateCommentResult.Created             => complete(StatusCodes.Created)
+                case CreateOrUpdateCommentResult.Updated             => complete(StatusCodes.NoContent)
+                case CreateOrUpdateCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+              }
+            }
+          },
+          delete {
+            val result = deleteCommentService.delete(accountNo, transactionId, appRequestContext.tenant)
+            onSuccess(result) {
+              case DeleteCommentResult.Deleted             => complete(StatusCodes.NoContent)
+              case DeleteCommentResult.TransactionNotFound => complete(StatusCodes.NotFound)
+            }
+          },
+        )
+      }
+    }
   }
 
 }

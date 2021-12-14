@@ -1,7 +1,14 @@
 package myapp.application
 
 import myapp.adapter.account.{ BankAccountApplication, RemittanceApplication }
+import myapp.adapter.query.{ CreateOrUpdateCommentService, DeleteCommentService, GetTransactionListService }
 import myapp.application.account.{ BankAccountApplicationImpl, RemittanceApplicationImpl }
+import myapp.application.projection.transaction.{ TransactionRepository, TransactionRepositoryImpl }
+import myapp.application.query.{
+  CreateOrUpdateCommentServiceImpl,
+  DeleteCommentServiceImpl,
+  GetTransactionListServiceImpl,
+}
 import myapp.application.util.healthcheck.{ JDBCHealthCheckApplication, JDBCHealthCheckApplicationImpl }
 import wvlet.airframe.{ newDesign, Design }
 
@@ -18,6 +25,10 @@ import wvlet.airframe.{ newDesign, Design }
 object ApplicationDIDesign {
   @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
   val applicationDesign: Design = newDesign
+    .bind[TransactionRepository].to[TransactionRepositoryImpl]
+    .bind[GetTransactionListService].to[GetTransactionListServiceImpl]
+    .bind[CreateOrUpdateCommentService].to[CreateOrUpdateCommentServiceImpl]
+    .bind[DeleteCommentService].to[DeleteCommentServiceImpl]
     .bind[BankAccountApplication].to[BankAccountApplicationImpl]
     .bind[RemittanceApplication].to[RemittanceApplicationImpl]
     .bind[JDBCHealthCheckApplication].to[JDBCHealthCheckApplicationImpl]

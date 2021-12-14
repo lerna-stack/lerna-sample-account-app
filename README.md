@@ -66,6 +66,10 @@ sbt clean test:compile test
   * 口座の残高が0未満になるような出金を行うことはできません。
 * [返金](#返金)
   * 返金によって口座残高が上限を超えることがあります。
+* [入出金明細出力](#入出金明細出力)
+* [コメント作成・更新](#コメント作成・更新)
+  * 入出金明細で出力される取引に対してコメントを付与できます。
+* [コメント削除](#コメント削除)
 * [送金](#送金)
   * 送金によって送金元口座の残高が不足する場合には送金できません。
   * 送金によって送金先口座の残高が上限を超える場合には送金できません。
@@ -241,6 +245,90 @@ curl \
 
 出金の取引ID の妥当性は、このAPIの利用者が保証する必要があります。
 
+#### 入出金明細出力
+口座に紐づく入出金取引履歴の一覧を出力します。
+
+- method: `GET`
+- path: `/accounts/${accountNo}/transactions`
+- (query) parameters
+  - 取引履歴を先頭から何件スキップして取得するか指定する値: `offset` (number)
+    - 指定しない場合はスキップされる件数は0
+  - 取得する取引履歴の最大個数: `limit` (number)
+    - 指定しない場合は最大で100件取得される
+- headers
+  - テナント: `X-Tenant-Id`: `${tenantId}`
+
+リクエスト例:
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'GET' \
+    --url 'http://127.0.0.1:9001/accounts/test33/transactions' \
+    --header 'X-Tenant-Id: tenant-a'
+```
+
+レスポンス例:
+```json
+{
+  "accountNo": "test33",
+  "tenant": "tenant-a",
+  "transactions": [
+    {
+      "amount": 600,
+      "balance": 600,
+      "comment": "string",
+      "transactedAt": 1637806463,
+      "transactionId": "string",
+      "transactionType": "Deposited"
+    }
+  ]
+}
+```
+
+入出金明細出力に関するアーキテクチャは、[入出金明細出力機能](docs/transaction-projection/index.md) を参照してください。
+
+#### コメント作成・更新
+口座に紐づく取引にコメントを付与できます。
+
+コメントの作成・更新に成功すると 201 Created (作成時)または 204 NoContent (更新時)を返します。
+指定した取引IDが存在しない場合は 404 NotFound を返します。
+
+- method: `PUT`
+- path: `/accounts/${accountNo}/transactions/${transactionId}/comment`
+- headers
+  - テナント: `X-Tenant-Id`:`${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'PUT' \
+    --url 'http://127.0.0.1:9001/accounts/test33/transactions/1638527686/comment' \
+    --header 'X-Tenant-Id: tenant-a' \
+    --header 'Content-Type: application/json' \
+    --data '{"comment":"HELLO WORLD"}'
+```
+
+#### コメント削除
+口座に紐づく取引に付与されたコメントを削除できます。
+
+コメントの削除に成功すると 204 NoContent を返します。
+指定した取引IDが存在しない場合は 404 NotFound を返します。
+
+- method: `DELETE`
+- path: `/accounts/${accountNo}/transactions/${transactionId}/comment`
+- headers
+    - テナント: `X-Tenant-Id`:`${tenantId}`
+
+```shell
+curl \
+    --silent \
+    --show-error \
+    --request 'DELETE' \
+    --url 'http://127.0.0.1:9001/accounts/test33/transactions/1638527686/comment' \
+    --header 'X-Tenant-Id: tenant-a'
+```
 
 ## 送金
 送金元口座から送金先口座に指定金額を送金します。
