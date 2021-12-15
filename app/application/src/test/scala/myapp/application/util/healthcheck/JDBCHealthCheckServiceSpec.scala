@@ -12,6 +12,7 @@ import org.scalatest.BeforeAndAfterAll
 import wvlet.airframe.{ newDesign, Design }
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
 class JDBCHealthCheckServiceSpec
@@ -58,17 +59,27 @@ class JDBCHealthCheckServiceSpec
     "return Healthy when it succeeded in db connection" in {
       check.expects().returns(Future.successful(true)).anyNumberOfTimes()
       val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
-      Thread.sleep(100)
-      healthChecker ! GetCurrentStatus(probe.ref)
-      probe.expectMessage(Healthy)
+      probe.awaitAssert(
+        {
+          healthChecker ! GetCurrentStatus(probe.ref)
+          probe.expectMessage(Healthy)
+        },
+        1000.millis,
+        100.millis,
+      )
     }
 
     "return Unhealthy when it failed to db connection" in {
       check.expects().returns(Future.successful(false)).anyNumberOfTimes()
       val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
-      Thread.sleep(100)
-      healthChecker ! GetCurrentStatus(probe.ref)
-      probe.expectMessage(Unhealthy)
+      probe.awaitAssert(
+        {
+          healthChecker ! GetCurrentStatus(probe.ref)
+          probe.expectMessage(Unhealthy)
+        },
+        1000.millis,
+        100.millis,
+      )
     }
   }
 }
