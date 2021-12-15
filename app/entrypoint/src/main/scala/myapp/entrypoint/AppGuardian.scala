@@ -44,16 +44,15 @@ object AppGuardian {
     import system.executionContext
     implicit val scheduler: actor.Scheduler = system.scheduler.toClassic
     val jDBCHealthCheck                     = new JDBCHealthCheck(system.classicSystem)
-    val result = akka.pattern
-      .retry(
-        () =>
-          jDBCHealthCheck().flatMap {
-            case true  => Future.successful(true)
-            case false => Future.failed(new IllegalStateException("Failed to DB connection"))
-          },
-        attempts = 10,
-        delay = 1000.millis,
-      )
+    val result = akka.pattern.retry(
+      () =>
+        jDBCHealthCheck().flatMap {
+          case true  => Future.successful(true)
+          case false => Future.failed(new IllegalStateException("Failed to DB connection"))
+        },
+      attempts = 10,
+      delay = 1000.millis,
+    )
     for (_ <- result.failed) {
       CoordinatedShutdown(system).run(JDBCHealthCheckFailureShutdown)
     }
