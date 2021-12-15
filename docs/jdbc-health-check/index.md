@@ -1,9 +1,9 @@
 # RDB のヘルスチェック機能
 
-MariaDB のヘルスチェックを行うことが可能です。
-アプリケーション起動時にヘルスチェックに失敗する場合アプリケーションの起動を中断しシャットダウンを行います。
-
+銀行口座アプリケーションではヘルスチェック機能を実装しており、アプリケーション起動時にヘルスチェックに失敗する場合はアプリケーションの起動を中断しシャットダウンを行います。
 また、[Akka Management](https://doc.akka.io/docs/akka-management/1.1.1/akka-management.html) を利用してヘルスチェック用のAPIを用意しています。
+
+現状のヘルスチェックではRDBにアクセスできることのみを確認しています。
 
 ## ソースコード
 * [JDBCHealthCheck.scala](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheck.scala)
