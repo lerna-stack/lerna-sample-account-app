@@ -1,7 +1,9 @@
 package myapp.entrypoint
 
+import akka.actor
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.adapter.TypedSchedulerOps
 import akka.actor.typed.{ Behavior, PreRestart }
 import com.typesafe.config.Config
 import myapp.application.util.healthcheck.{ JDBCHealthCheck, JDBCHealthCheckFailureShutdown, JDBCHealthCheckService }
@@ -9,6 +11,7 @@ import myapp.entrypoint.Main.logger
 import wvlet.airframe.Design
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 @SuppressWarnings(Array("org.wartremover.contrib.warts.MissingOverride"))
 object AppGuardian {
@@ -39,9 +42,21 @@ object AppGuardian {
     context.spawn(session.build[JDBCHealthCheckService].createBehavior(), "JDBCHealthChecker")
 
     import system.executionContext
-    Thread.sleep(10000)
-    val healthCheck = new JDBCHealthCheck(system.classicSystem)
-    for (result <- healthCheck() if !result) CoordinatedShutdown(system).run(JDBCHealthCheckFailureShutdown)
+    implicit val scheduler: actor.Scheduler = system.scheduler.toClassic
+    val jDBCHealthCheck                     = new JDBCHealthCheck(system.classicSystem)
+    val result = akka.pattern
+      .retry(
+        () =>
+          jDBCHealthCheck().flatMap {
+            case true  => Future.successful(true)
+            case false => Future.failed(new IllegalStateException("Failed to DB connection"))
+          },
+        attempts = 10,
+        delay = 1000.millis,
+      )
+    for (_ <- result.failed) {
+      CoordinatedShutdown(system).run(JDBCHealthCheckFailureShutdown)
+    }
 
     Behaviors.receiveSignal[Nothing] {
       case (_, PreRestart) =>
