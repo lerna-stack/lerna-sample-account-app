@@ -34,7 +34,7 @@ class JDBCHealthCheckServiceSpec
       ConfigFactory
         .parseString {
           """
-          myapp.application.util.healthcheck {
+          myapp.application.util.healthcheck.jdbc {
             interval = 1ms
             healthy-threshold = 1
             unhealthy-threshold = 1
