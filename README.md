@@ -121,7 +121,7 @@ curl --silent --noproxy "*" http://127.0.0.2:9002/commit-hash
  curl --silent --noproxy "*" http://127.0.0.1:8558/ready
 ```
 
-詳細は[ヘルスチェック機能](docs/jdbc-health-check/index.md)を参照ください。
+詳細は[ヘルスチェック機能](docs/health-check/index.md)を参照ください。
 
 ### Bank Accounts
 #### 残高確認
