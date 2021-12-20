@@ -13,17 +13,11 @@ import myapp.application.util.healthcheck.JDBCHealthCheckService.{
   Unhealthy,
 }
 import myapp.utility.scalatest.StandardSpec
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration.DurationInt
 
-class JDBCHealthCheckSpec extends ScalaTestWithTypedActorTestKit with StandardSpec with BeforeAndAfterAll {
-
-  override def afterAll(): Unit = {
-    testKit.shutdownTestKit()
-    super.afterAll()
-  }
+class JDBCHealthCheckSpec extends ScalaTestWithTypedActorTestKit with StandardSpec {
 
   def healthyMock: Behavior[Command] = Behaviors.setup { context =>
     Behaviors.receiveMessage[Command] {

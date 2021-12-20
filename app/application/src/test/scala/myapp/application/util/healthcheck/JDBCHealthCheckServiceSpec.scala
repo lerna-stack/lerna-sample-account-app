@@ -8,7 +8,6 @@ import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import myapp.utility.scalatest.StandardSpec
 import org.scalamock.function.MockFunction0
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.BeforeAndAfterAll
 import wvlet.airframe.{ newDesign, Design }
 
 import scala.concurrent.Future
@@ -18,7 +17,6 @@ import scala.concurrent.duration.DurationInt
 class JDBCHealthCheckServiceSpec
     extends ScalaTestWithTypedActorTestKit
     with StandardSpec
-    with BeforeAndAfterAll
     with MockFactory
     with DISessionSupport {
   import JDBCHealthCheckService._
@@ -49,11 +47,6 @@ class JDBCHealthCheckServiceSpec
   val service: JDBCHealthCheckService         = diSession.build[JDBCHealthCheckService]
   val probe: TestProbe[GetCurrentStatusReply] = testKit.createTestProbe[GetCurrentStatusReply]()
   val check: MockFunction0[Future[Boolean]]   = mockApp.check _
-
-  override def afterAll(): Unit = {
-    testKit.shutdownTestKit()
-    super.afterAll()
-  }
 
   "JDBCHealthCheckService" should {
     "return Healthy when it succeeded in db connection" in {
