@@ -40,18 +40,18 @@ class JDBCHealthCheckSpec extends ScalaTestWithTypedActorTestKit with StandardSp
     "return true if the health check has succeeded" in {
       val actor = testKit.spawn[Command](healthyMock)
       system.receptionist ! Receptionist.register(JDBCHealthCheckServiceKey, actor)
-      val probe  = testKit.createTestProbe()
-      val result = probe.awaitAssert((new JDBCHealthCheck(system.toClassic))().futureValue, 1000.millis, 100.millis)
-      expect(result)
+      val probe     = testKit.createTestProbe()
+      val isHealthy = probe.awaitAssert((new JDBCHealthCheck(system.toClassic))().futureValue, 1000.millis, 100.millis)
+      expect(isHealthy === true)
       system.receptionist ! Receptionist.deregister(JDBCHealthCheckServiceKey, actor)
     }
 
     "return false if the health check has failed" in {
       val actor = testKit.spawn[Command](unhealthyMock)
       system.receptionist ! Receptionist.register(JDBCHealthCheckServiceKey, actor)
-      val probe  = testKit.createTestProbe()
-      val result = probe.awaitAssert((new JDBCHealthCheck(system.toClassic))().futureValue, 1000.millis, 100.millis)
-      expect(!result)
+      val probe     = testKit.createTestProbe()
+      val isHealthy = probe.awaitAssert((new JDBCHealthCheck(system.toClassic))().futureValue, 1000.millis, 100.millis)
+      expect(isHealthy === false)
       system.receptionist ! Receptionist.deregister(JDBCHealthCheckServiceKey, actor)
     }
 
