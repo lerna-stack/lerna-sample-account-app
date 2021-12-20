@@ -49,7 +49,7 @@ class JDBCHealthCheckServiceSpec
   val check: MockFunction0[Future[Boolean]]   = mockApp.check _
 
   "JDBCHealthCheckService" should {
-    "return Healthy when it succeeded in db connection" in {
+    "return Healthy when it succeed in health check" in {
       check.expects().returns(Future.successful(true)).anyNumberOfTimes()
       val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
       probe.awaitAssert(
@@ -62,17 +62,31 @@ class JDBCHealthCheckServiceSpec
       )
     }
 
-    "return Unhealthy when it failed to db connection" in {
-      check.expects().returns(Future.successful(false)).anyNumberOfTimes()
-      val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
-      probe.awaitAssert(
-        {
-          healthChecker ! GetCurrentStatus(probe.ref)
-          probe.expectMessage(Unhealthy)
-        },
-        1000.millis,
-        100.millis,
-      )
+    "return Unhealthy when it fail to health check" when {
+      "JDBCHealthCheckApplication::check return false" in {
+        check.expects().returns(Future.successful(false)).anyNumberOfTimes()
+        val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
+        probe.awaitAssert(
+          {
+            healthChecker ! GetCurrentStatus(probe.ref)
+            probe.expectMessage(Unhealthy)
+          },
+          1000.millis,
+          100.millis,
+        )
+      }
+      "JDBCHealthCheckApplication::check throw exception" in {
+        check.expects().throws(new RuntimeException("failed to exec sql query.")).anyNumberOfTimes()
+        val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
+        probe.awaitAssert(
+          {
+            healthChecker ! GetCurrentStatus(probe.ref)
+            probe.expectMessage(Unhealthy)
+          },
+          1000.millis,
+          100.millis,
+        )
+      }
     }
   }
 }
