@@ -19,22 +19,20 @@ import scala.concurrent.duration.DurationInt
 
 class JDBCHealthCheckSpec extends ScalaTestWithTypedActorTestKit with StandardSpec {
 
-  def healthyMock: Behavior[Command] = Behaviors.setup { context =>
+  def healthyMock: Behavior[Command] =
     Behaviors.receiveMessage[Command] {
       case GetCurrentStatus(replyTo) =>
         replyTo ! Healthy
         Behaviors.same
       case _ => Behaviors.same
     }
-  }
-  def unhealthyMock: Behavior[Command] = Behaviors.setup { context =>
+  def unhealthyMock: Behavior[Command] =
     Behaviors.receiveMessage[Command] {
       case GetCurrentStatus(replyTo) =>
         replyTo ! Unhealthy
         Behaviors.same
       case _ => Behaviors.same
     }
-  }
 
   "JDBCHealthCheck" should {
     "return true if the health check has succeeded" in {
