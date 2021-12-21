@@ -6,12 +6,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter.TypedSchedulerOps
 import akka.actor.typed.{ Behavior, PreRestart }
 import com.typesafe.config.Config
-import myapp.application.util.healthcheck.{
-  JDBCHealthCheck,
-  JDBCHealthCheckFailureShutdown,
-  JDBCHealthCheckService,
-  JDBCHealthCheckSetting,
-}
+import myapp.application.util.healthcheck.{ JDBCHealthCheck, JDBCHealthCheckFailureShutdown, JDBCHealthCheckService }
 import myapp.entrypoint.Main.logger
 import wvlet.airframe.Design
 
@@ -47,9 +42,8 @@ object AppGuardian {
 
     import system.executionContext
     implicit val scheduler: actor.Scheduler = system.scheduler.toClassic
-    val healthCheckSetting                  = session.build[JDBCHealthCheckSetting]
     val healthCheckRetrySetting             = session.build[AppGuardianSetting]
-    val jDBCHealthCheck                     = new JDBCHealthCheck(system.classicSystem, healthCheckSetting)
+    val jDBCHealthCheck                     = new JDBCHealthCheck(system.classicSystem)
     val result = akka.pattern.retry(
       () =>
         jDBCHealthCheck().flatMap {

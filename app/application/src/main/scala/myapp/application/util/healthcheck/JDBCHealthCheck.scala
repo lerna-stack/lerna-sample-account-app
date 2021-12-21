@@ -10,9 +10,9 @@ import myapp.application.util.healthcheck.JDBCHealthCheckService.JDBCHealthCheck
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-class JDBCHealthCheck(system: ActorSystem, setting: JDBCHealthCheckSetting) extends (() => Future[Boolean]) {
+class JDBCHealthCheck(system: ActorSystem) extends (() => Future[Boolean]) {
   private[this] val typedSystem                   = system.toTyped
-  private[this] implicit val timeout: Timeout     = Timeout(setting.timeout)
+  private[this] implicit val timeout: Timeout     = Timeout(new JDBCHealthCheckSetting(system.settings.config).timeout)
   private[this] implicit val scheduler: Scheduler = typedSystem.scheduler
   private[this] implicit val ec: ExecutionContext = typedSystem.executionContext
 
