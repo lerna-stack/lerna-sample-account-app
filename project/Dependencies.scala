@@ -50,6 +50,7 @@ object Dependencies {
     val streamTestKit        = "com.typesafe.akka" %% "akka-stream-testkit"         % Versions.akka
     val multiNodeTestKit     = "com.typesafe.akka" %% "akka-multi-node-testkit"     % Versions.akka
     val persistenceTestKit   = "com.typesafe.akka" %% "akka-persistence-testkit"    % Versions.akka
+    val discovery            = "com.typesafe.akka" %% "akka-discovery"              % Versions.akka
   }
 
   object AkkaHttp {
@@ -60,6 +61,8 @@ object Dependencies {
 
   object AkkaManagement {
     val management = "com.lightbend.akka.management" %% "akka-management" % Versions.akkaManagement
+    val clusterBootstrap =
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % Versions.akkaManagement
   }
 
   object AkkaPersistenceCassandra {
