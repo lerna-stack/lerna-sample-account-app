@@ -2,6 +2,7 @@ package myapp.entrypoint
 
 import akka.actor.typed.ActorSystem
 import akka.cluster.Cluster
+import akka.management.cluster.bootstrap.ClusterBootstrap
 import akka.management.scaladsl.AkkaManagement
 import com.typesafe.config.ConfigFactory
 import lerna.log.AppLogging
@@ -45,4 +46,6 @@ object Main extends App with AppLogging {
   }
 
   AkkaManagement(system).start()
+
+  ClusterBootstrap(system).start()
 }
