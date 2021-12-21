@@ -3,17 +3,16 @@ package myapp.application.util.healthcheck
 import akka.actor.ActorSystem
 import akka.actor.typed.Scheduler
 import akka.actor.typed.receptionist.Receptionist
-
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration._
-import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.AskPattern._
+import akka.actor.typed.scaladsl.adapter._
 import akka.util.Timeout
 import myapp.application.util.healthcheck.JDBCHealthCheckService.JDBCHealthCheckServiceKey
 
-class JDBCHealthCheck(system: ActorSystem) extends (() => Future[Boolean]) {
+import scala.concurrent.{ ExecutionContext, Future }
+
+class JDBCHealthCheck(system: ActorSystem, setting: JDBCHealthCheckSetting) extends (() => Future[Boolean]) {
   private[this] val typedSystem                   = system.toTyped
-  private[this] implicit val timeout: Timeout     = Timeout(500.millis) // FIXME: 設定できるようにするか検討
+  private[this] implicit val timeout: Timeout     = Timeout(setting.timeout)
   private[this] implicit val scheduler: Scheduler = typedSystem.scheduler
   private[this] implicit val ec: ExecutionContext = typedSystem.executionContext
 
