@@ -29,7 +29,7 @@ object JDBCHealthCheckService {
 @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 class JDBCHealthCheckService(
     jdbcHealthCheckApplication: JDBCHealthCheckApplication,
-    settings: JDBCHealthCheckServiceSettings,
+    setting: JDBCHealthCheckServiceSetting,
 ) {
   import JDBCHealthCheckService._
 
@@ -39,7 +39,7 @@ class JDBCHealthCheckService(
   }
 
   private[this] def healthy(failureCount: Int = 0): Behavior[Command] = Behaviors.withTimers { timers =>
-    timers.startSingleTimer(TickTimerKey, Tick, settings.interval)
+    timers.startSingleTimer(TickTimerKey, Tick, setting.interval)
 
     Behaviors.setup { context =>
       Behaviors.receiveMessage {
@@ -52,7 +52,7 @@ class JDBCHealthCheckService(
           healthy(0) // reset
         case HealthCheckFailed(cause) =>
           val newFailureCount = failureCount + 1
-          if (newFailureCount >= settings.unhealthyThreshold) {
+          if (newFailureCount >= setting.unhealthyThreshold) {
             unhealthy()
           } else {
             healthy(newFailureCount)
@@ -62,7 +62,7 @@ class JDBCHealthCheckService(
   }
 
   private[this] def unhealthy(successCount: Int = 0): Behavior[Command] = Behaviors.withTimers { timers =>
-    timers.startSingleTimer(TickTimerKey, Tick, settings.interval)
+    timers.startSingleTimer(TickTimerKey, Tick, setting.interval)
 
     Behaviors.setup { context =>
       Behaviors.receiveMessage {
@@ -73,7 +73,7 @@ class JDBCHealthCheckService(
           check(context)
         case HealthCheckSucceeded() =>
           val newSuccessCount = successCount + 1
-          if (newSuccessCount >= settings.healthyThreshold) {
+          if (newSuccessCount >= setting.healthyThreshold) {
             healthy()
           } else {
             unhealthy(newSuccessCount)

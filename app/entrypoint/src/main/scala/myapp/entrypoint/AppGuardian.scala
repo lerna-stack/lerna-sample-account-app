@@ -48,7 +48,7 @@ object AppGuardian {
     import system.executionContext
     implicit val scheduler: actor.Scheduler = system.scheduler.toClassic
     val healthCheckSetting                  = session.build[JDBCHealthCheckSetting]
-    val healthCheckRetrySettings            = session.build[AppGuardianSettings]
+    val healthCheckRetrySetting             = session.build[AppGuardianSetting]
     val jDBCHealthCheck                     = new JDBCHealthCheck(system.classicSystem, healthCheckSetting)
     val result = akka.pattern.retry(
       () =>
@@ -56,8 +56,8 @@ object AppGuardian {
           case true  => Future.successful(true)
           case false => Future.failed(new IllegalStateException("Failed to DB connection"))
         },
-      attempts = healthCheckRetrySettings.attempt,
-      delay = healthCheckRetrySettings.delay,
+      attempts = healthCheckRetrySetting.attempt,
+      delay = healthCheckRetrySetting.delay,
     )
     for (_ <- result.failed) {
       CoordinatedShutdown(system).run(JDBCHealthCheckFailureShutdown)

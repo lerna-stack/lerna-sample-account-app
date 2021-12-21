@@ -10,5 +10,5 @@
 * [JDBCHealthCheckApplication](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheckApplication.scala)
 * [JDBCHealthCheckFailureShutdown](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheckFailureShutdown.scala)
 * [JDBCHealthCheckService.scala](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheckService.scala)
-* [JDBCHealthCheckServiceSettings.scala](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheckServiceSettings.scala)
+* [JDBCHealthCheckServiceSettings.scala](../../app/application/src/main/scala/myapp/application/util/healthcheck/JDBCHealthCheckServiceSetting.scala)
 * [AppGuardian.scala](../../app/entrypoint/src/main/scala/myapp/entrypoint/AppGuardian.scala)
