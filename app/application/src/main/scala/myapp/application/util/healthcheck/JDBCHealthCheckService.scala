@@ -50,7 +50,7 @@ class JDBCHealthCheckService(
           check(context)
         case HealthCheckSucceeded() =>
           healthy(0) // reset
-        case HealthCheckFailed(cause) =>
+        case HealthCheckFailed(_) =>
           val newFailureCount = failureCount + 1
           if (newFailureCount >= setting.unhealthyThreshold) {
             unhealthy()
@@ -78,7 +78,7 @@ class JDBCHealthCheckService(
           } else {
             unhealthy(newSuccessCount)
           }
-        case HealthCheckFailed(cause) =>
+        case HealthCheckFailed(_) =>
           unhealthy(0) // reset
       }
     }
