@@ -5,6 +5,7 @@ sbt \
 -Dfork=true \
 -Dakka.cluster.min-nr-of-members=3 \
 -Dakka.cluster.roles.0="replica-group-3" \
+-Dakka.management.http.hostname="127.0.0.3" \
 -Dakka.remote.artery.canonical.hostname="127.0.0.3" \
 -Dmyapp.server-mode=DEV \
 -Dmyapp.private-internet.http.interface="127.0.0.3" \
