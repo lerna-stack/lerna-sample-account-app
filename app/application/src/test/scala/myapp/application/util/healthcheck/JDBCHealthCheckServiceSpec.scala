@@ -75,8 +75,8 @@ class JDBCHealthCheckServiceSpec
           100.millis,
         )
       }
-      "JDBCHealthCheckApplication::check throw exception" in {
-        check.expects().throws(new RuntimeException("failed to exec sql query.")).anyNumberOfTimes()
+      "an exception occurs in JDBCHealthCheckApplication::check" in {
+        check.expects().returns(Future.failed(new RuntimeException("failed to exec sql query."))).anyNumberOfTimes()
         val healthChecker: ActorRef[Command] = testKit.spawn(service.createBehavior())
         probe.awaitAssert(
           {
