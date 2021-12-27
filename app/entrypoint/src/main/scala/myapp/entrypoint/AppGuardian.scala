@@ -6,7 +6,6 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter.TypedSchedulerOps
 import akka.actor.typed.{ Behavior, PreRestart }
 import akka.management.cluster.bootstrap.ClusterBootstrap
-import akka.management.scaladsl.AkkaManagement
 import com.typesafe.config.Config
 import myapp.application.util.healthcheck.{ JDBCHealthCheck, JDBCHealthCheckFailureShutdown, JDBCHealthCheckService }
 import myapp.entrypoint.Main.logger
@@ -58,7 +57,6 @@ object AppGuardian {
     )
     healthCheckResult.onComplete {
       case Success(_) =>
-        AkkaManagement(system).start()
         ClusterBootstrap(system).start()
       case Failure(_) =>
         CoordinatedShutdown(system).run(JDBCHealthCheckFailureShutdown)

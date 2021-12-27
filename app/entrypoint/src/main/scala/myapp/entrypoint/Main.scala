@@ -2,6 +2,7 @@ package myapp.entrypoint
 
 import akka.actor.typed.ActorSystem
 import akka.cluster.Cluster
+import akka.management.scaladsl.AkkaManagement
 import com.typesafe.config.ConfigFactory
 import lerna.log.AppLogging
 import lerna.util.encryption.EncryptionConfig
@@ -35,6 +36,8 @@ object Main extends App with AppLogging {
   private val system: ActorSystem[Nothing] =
     ActorSystem[Nothing](AppGuardian(config), "MyAppSystem", config)
   logger.info("ActorSystem({})起動完了", system)
+
+  AkkaManagement(system).start()
 
   val cluster = Cluster(system)
   logger.info("Akka Clusterへの参加待機中: {}", cluster.state)
