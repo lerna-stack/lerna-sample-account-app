@@ -9,6 +9,7 @@ import myapp.application.query.{
   DeleteCommentServiceImpl,
   GetTransactionListServiceImpl,
 }
+import myapp.application.util.healthcheck.{ JDBCHealthCheckApplication, JDBCHealthCheckApplicationImpl }
 import wvlet.airframe.{ newDesign, Design }
 
 /** Application プロジェクト内のコンポーネントの [[wvlet.airframe.Design]] を定義する
@@ -30,4 +31,5 @@ object ApplicationDIDesign {
     .bind[DeleteCommentService].to[DeleteCommentServiceImpl]
     .bind[BankAccountApplication].to[BankAccountApplicationImpl]
     .bind[RemittanceApplication].to[RemittanceApplicationImpl]
+    .bind[JDBCHealthCheckApplication].to[JDBCHealthCheckApplicationImpl]
 }
