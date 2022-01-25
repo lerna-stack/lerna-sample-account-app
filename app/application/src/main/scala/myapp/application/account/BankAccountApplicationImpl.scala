@@ -26,6 +26,9 @@ class BankAccountApplicationImpl(implicit system: ActorSystem[Nothing]) extends 
       .withEventSourcedJournalPluginId(
         s"akka-entity-replication.eventsourced.persistence.cassandra-${tenant.id}.journal",
       )
+      .withEventSourcedSnapshotStorePluginId(
+        s"akka-entity-replication.eventsourced.persistence.cassandra-${tenant.id}.snapshot",
+      )
 
     val entity = ReplicatedEntity(BankAccountBehavior.typeKey)(context => BankAccountBehavior(context))
       .withSettings(settings)
