@@ -6,6 +6,9 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 ## Unreleased
 
+### Fixed
+- 送金オーケストレータ機能で Cassandra からイベントなどを読み込む際のプロファイルが書き込みの際に使われるプロファイルとは違うものになっていた問題を修正 [PR#42](https://github.com/lerna-stack/lerna-sample-account-app/pull/42)
+
 ### Added
 - 口座番号とテナントに紐づく入出金明細を出力する実装を追加 [PR#32](https://github.com/lerna-stack/lerna-sample-account-app/pull/32),
 [PR#34](https://github.com/lerna-stack/lerna-sample-account-app/pull/34)
