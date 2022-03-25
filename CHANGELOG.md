@@ -4,7 +4,12 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 
 このファイルの書き方に関する推奨事項については、[Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) を確認してください。
 
-## Unreleased
+## [Unreleased]
+[Unreleased]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2022.3.0...main
+
+
+## [v2022.3.0] - 2022-3-25
+[v2022.3.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2021.10.0...v2022.3.0
 
 ### Fixed
 - 送金オーケストレータ機能で Cassandra からイベントなどを読み込む際のプロファイルが書き込みの際に使われるプロファイルとは違うものになっていた問題を修正 [PR#42](https://github.com/lerna-stack/lerna-sample-account-app/pull/42)
