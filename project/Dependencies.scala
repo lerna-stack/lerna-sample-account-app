@@ -4,7 +4,7 @@ object Dependencies {
 
   object Versions {
     val akkaEntityReplication    = "2.1.0"
-    val lerna                    = "3.0.0-6-ca3f2b2b-SNAPSHOT"
+    val lerna                    = "3.0.1"
     val akka                     = "2.6.17"
     val akkaHttp                 = "10.2.4"
     val akkaPersistenceCassandra = "1.0.1"
