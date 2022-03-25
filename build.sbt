@@ -4,7 +4,6 @@ import scala.util.Try
 
 ThisBuild / name := "myapp"
 ThisBuild / description := "description"
-ThisBuild / version := "2021.10.0"
 ThisBuild / organization := "organization"
 ThisBuild / scalaVersion := "2.13.6"
 ThisBuild / scalacOptions ++= Seq(
@@ -33,8 +32,6 @@ ThisBuild / fork in Test := true
 // forkプロセスのstdoutをこのプロセスのstdout,stderrをこのプロセスのstderrに転送する
 // デフォルトのLoggedOutputでは、airframeやkamonが標準エラーに出力するログが[error]とプリフィクスがつき紛らわしいため
 ThisBuild / outputStrategy := Some(StdoutOutput)
-// TODO Remove this snapshot repo after stable version release
-ThisBuild / resolvers += Resolver.sonatypeRepo("snapshots")
 
 lazy val root = (project in file("."))
   .enablePlugins(JavaAppPackaging, JavaServerAppPackaging, RpmPlugin, SystemdPlugin)
