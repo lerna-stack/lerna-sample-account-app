@@ -4,7 +4,6 @@ import scala.util.Try
 
 ThisBuild / name := "myapp"
 ThisBuild / description := "description"
-ThisBuild / version := "2021.10.0"
 ThisBuild / organization := "organization"
 ThisBuild / scalaVersion := "2.13.6"
 ThisBuild / scalacOptions ++= Seq(
