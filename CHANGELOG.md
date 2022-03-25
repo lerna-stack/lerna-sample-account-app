@@ -23,9 +23,9 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 - RDBのアクセスを確認するヘルスチェック機能を追加 [PR#31](https://github.com/lerna-stack/lerna-sample-account-app/pull/31/)
 
 ### Dependency Updates
-* akka-entity-replication 2.0.0 から 2.0.0+280-0352e28d-SNAPSHOT に更新しました
+* akka-entity-replication 2.0.0 から 2.1.0 に更新しました
 * akka 2.6.12 から 2.6.17 に更新しました
-* lerna-app-library 3.0.0 から 3.0.0-6-ca3f2b2b-SNAPSHOT に更新しました
+* lerna-app-library 3.0.0 から 3.0.1 に更新しました
 
 
 ## [v2021.10.0] - 2021-10-22
