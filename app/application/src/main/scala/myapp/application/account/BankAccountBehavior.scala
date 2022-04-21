@@ -124,24 +124,24 @@ object BankAccountBehavior extends AppTypedActorLogging {
   final case class Account(
       accountNo: AccountNo,
       balance: BigInt,
-      @JsonSerialize(converter = classOf[Account.ResentTransactionsSerializerConverter])
-      @JsonDeserialize(converter = classOf[Account.ResentTransactionsDeserializerConverter])
-      resentTransactions: ListMap[TransactionId, DomainEvent],
+      @JsonSerialize(converter = classOf[Account.RecentTransactionsSerializerConverter])
+      @JsonDeserialize(converter = classOf[Account.RecentTransactionsDeserializerConverter])
+      recentTransactions: ListMap[TransactionId, DomainEvent],
   ) {
 
     def withBalance(balance: BigInt): Account = copy(balance = balance)
 
-    private[this] val maxResentTransactionSize = 30
+    private[this] val maxRecentTransactionSize = 30
 
     def recordEvent(transactionId: TransactionId, event: DomainEvent): Account =
-      copy(resentTransactions = (resentTransactions + (transactionId -> event)).takeRight(maxResentTransactionSize))
+      copy(recentTransactions = (recentTransactions + (transactionId -> event)).takeRight(maxRecentTransactionSize))
 
     @SuppressWarnings(Array("lerna.warts.CyclomaticComplexity"))
     def applyCommand(command: Command, logger: AppLogger): Effect =
       command match {
         case command @ Deposit(transactionId, amount, replyTo) =>
           import command.appRequestContext
-          resentTransactions.get(transactionId) match {
+          recentTransactions.get(transactionId) match {
             // Receive a known transaction: replies message based on the stored event in recentTransactions
             case Some(_: Deposited) =>
               Effect.reply(replyTo)(DepositSucceeded(balance))
@@ -173,7 +173,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
           }
         case command @ Withdraw(transactionId, amount, replyTo) =>
           import command.appRequestContext
-          resentTransactions.get(transactionId) match {
+          recentTransactions.get(transactionId) match {
             // Receive a known transaction: replies message based on stored event in resetTransactions
             case Some(_: Withdrew) =>
               Effect.reply(replyTo)(WithdrawSucceeded(balance))
@@ -216,7 +216,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
     private def applyRefundCommand(command: Refund, logger: AppLogger): Effect = {
       import command.appRequestContext
       val Refund(transactionId, withdrawalTransactionId, refundAmount, replyTo) = command
-      resentTransactions.get(transactionId) match {
+      recentTransactions.get(transactionId) match {
         case Some(refunded: Refunded) =>
           val isValidCommand = {
             refunded.withdrawalTransactionId === withdrawalTransactionId &&
@@ -287,20 +287,20 @@ object BankAccountBehavior extends AppTypedActorLogging {
       val ANSI_YELLOW = "\u001B[33m"
       val ANSI_RESET  = "\u001B[0m"
       logger.info(
-        s"${ANSI_YELLOW}[LEADER]${ANSI_RESET} ${event.toString} [balance: ${state.balance.toString}, resent-transactions: ${state.resentTransactions.size.toString}]",
+        s"${ANSI_YELLOW}[LEADER]${ANSI_RESET} ${event.toString} [balance: ${state.balance.toString}, recent-transactions: ${state.recentTransactions.size.toString}]",
       )
     }
   }
 
   object Account {
 
-    private[BankAccountBehavior] class ResentTransactionsSerializerConverter
+    private[BankAccountBehavior] class RecentTransactionsSerializerConverter
         extends StdConverter[ListMap[TransactionId, DomainEvent], List[(TransactionId, DomainEvent)]] {
       override def convert(value: ListMap[TransactionId, DomainEvent]): List[(TransactionId, DomainEvent)] =
         value.toList
     }
 
-    private[BankAccountBehavior] class ResentTransactionsDeserializerConverter
+    private[BankAccountBehavior] class RecentTransactionsDeserializerConverter
         extends StdConverter[List[(TransactionId, DomainEvent)], ListMap[TransactionId, DomainEvent]] {
       override def convert(value: List[(TransactionId, DomainEvent)]): ListMap[TransactionId, DomainEvent] =
         ListMap.from(value)

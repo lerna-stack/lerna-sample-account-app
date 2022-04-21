@@ -254,7 +254,7 @@ class BankAccountBehaviorSpec
       }
       inside(refundResult.state) { account =>
         account.balance should be(1000)
-        account.resentTransactions(refundId) should be(refunded)
+        account.recentTransactions(refundId) should be(refunded)
       }
       refundResult.replyOfType[RefundSucceeded].balance should be(1000)
 
@@ -293,7 +293,7 @@ class BankAccountBehaviorSpec
       }
       inside(refundResult.state) { account =>
         account.balance should be(expectedBalance)
-        account.resentTransactions(refundId) should be(refunded)
+        account.recentTransactions(refundId) should be(refunded)
       }
       refundResult.replyOfType[RefundSucceeded].balance should be(expectedBalance)
 
@@ -325,7 +325,7 @@ class BankAccountBehaviorSpec
       }
       inside(refundResult.state) { account =>
         account.balance should be(700)
-        account.resentTransactions(refundId) should be(invalidRefundRequested)
+        account.recentTransactions(refundId) should be(invalidRefundRequested)
       }
       refundResult.replyOfType[InvalidRefundCommand]
 
