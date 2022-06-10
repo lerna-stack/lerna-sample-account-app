@@ -7,7 +7,8 @@ ENV PROJECT_PATH '/project'
 ENV WORKSPACE    '/workspace'
 
 RUN set -xe; \
-  curl https://bintray.com/sbt/rpm/rpm | tee /etc/yum.repos.d/bintray-sbt-rpm.repo; \
+  curl -L https://www.scala-sbt.org/sbt-rpm.repo > sbt-rpm.repo; \
+  mv sbt-rpm.repo /etc/yum.repos.d/; \
   yum install --disablerepo=updates -y \
     rpmdevtools \
     yum-utils \
