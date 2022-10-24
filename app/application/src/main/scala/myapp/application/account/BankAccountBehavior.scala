@@ -9,6 +9,7 @@ import lerna.akka.entityreplication.typed._
 import lerna.log.{ AppLogger, AppTypedActorLogging }
 import lerna.util.lang.Equals._
 import myapp.adapter.account.{ AccountNo, TransactionId }
+import myapp.application.account.BankAccountBehavior.DomainEvent.EventNo
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.AppTenant
 
@@ -70,12 +71,27 @@ object BankAccountBehavior extends AppTypedActorLogging {
     ),
   )
   sealed trait DomainEvent {
+
+    /** イベント番号
+      *
+      * データ不整合となるような事象(イベントの重複や欠落)を早期に検出するために使用する。
+      * データ不整合となるような事象が発生しなければ、必ず1ずつ増加する。
+      */
+    def eventNo: DomainEvent.EventNo
+
     def appRequestContext: AppRequestContext
+
+  }
+  object DomainEvent {
+    final case class EventNo(value: Long) extends AnyVal {
+      def next: EventNo = EventNo(value + 1)
+    }
   }
 
   sealed trait DepositDomainEvent extends DomainEvent
   final case class Deposited(
       accountNo: AccountNo,
+      eventNo: EventNo,
       transactionId: TransactionId,
       amount: BigInt,
       balance: BigInt,
@@ -83,13 +99,14 @@ object BankAccountBehavior extends AppTypedActorLogging {
   )(implicit
       val appRequestContext: AppRequestContext,
   ) extends DepositDomainEvent
-  final case class BalanceExceeded(transactionId: TransactionId)(implicit
+  final case class BalanceExceeded(eventNo: EventNo, transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
   ) extends DepositDomainEvent
 
   sealed trait WithdrawalDomainEvent extends DomainEvent
   final case class Withdrew(
       accountNo: AccountNo,
+      eventNo: EventNo,
       transactionId: TransactionId,
       amount: BigInt,
       balance: BigInt,
@@ -97,13 +114,14 @@ object BankAccountBehavior extends AppTypedActorLogging {
   )(implicit
       val appRequestContext: AppRequestContext,
   ) extends WithdrawalDomainEvent
-  final case class BalanceShorted(transactionId: TransactionId)(implicit
+  final case class BalanceShorted(eventNo: EventNo, transactionId: TransactionId)(implicit
       val appRequestContext: AppRequestContext,
   ) extends WithdrawalDomainEvent
 
   sealed trait RefundDomainEvent extends DomainEvent
   final case class Refunded(
       accountNo: AccountNo,
+      eventNo: EventNo,
       transactionId: TransactionId,
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
@@ -112,6 +130,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
   )(implicit val appRequestContext: AppRequestContext)
       extends RefundDomainEvent
   final case class InvalidRefundRequested(
+      eventNo: EventNo,
       transactionId: TransactionId,
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
@@ -121,8 +140,20 @@ object BankAccountBehavior extends AppTypedActorLogging {
 
   type Effect = lerna.akka.entityreplication.typed.Effect[DomainEvent, Account]
 
+  /** 口座
+    *
+    * BankAccountBehavior の状態 を表す。
+    *
+    * @param lastAppliedEventNo 最後に適用したイベント番号を表す。
+    *                           この状態でレプリケーションするイベントには `lastAppliedEventNo + 1` を設定すること。
+    *                           この状態に適用できるイベントのイベント番号は `lastAppliedEventNo + 1` である。
+    *                           `lastAppliedEventNo + 1` 以外のイベント番号を持つイベントの適用が発生した場合、
+    *                           データ不整合となるような不具合が発生している可能性がある。
+    *                           最後に適用したイベントがない場合、`EventNo(0)` とする。
+    */
   final case class Account(
       accountNo: AccountNo,
+      lastAppliedEventNo: EventNo,
       balance: BigInt,
       @JsonSerialize(converter = classOf[Account.RecentTransactionsSerializerConverter])
       @JsonDeserialize(converter = classOf[Account.RecentTransactionsDeserializerConverter])
@@ -130,6 +161,9 @@ object BankAccountBehavior extends AppTypedActorLogging {
   ) {
 
     def withBalance(balance: BigInt): Account = copy(balance = balance)
+
+    def withLastAppliedEventNo(lastAppliedEventNo: EventNo): Account =
+      copy(lastAppliedEventNo = lastAppliedEventNo)
 
     private[this] val maxRecentTransactionSize = 30
 
@@ -152,7 +186,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
             // Receive an unknown transaction
             case None =>
               if (balance + amount > BalanceMaxLimit) {
-                val event = BalanceExceeded(transactionId)
+                val event = BalanceExceeded(lastAppliedEventNo.next, transactionId)
                 Effect
                   .replicate[DomainEvent, Account](event)
                   .thenRun(logEvent(event, logger)(_))
@@ -160,6 +194,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               } else {
                 val event = Deposited(
                   accountNo,
+                  lastAppliedEventNo.next,
                   transactionId,
                   amount,
                   amount + balance,
@@ -184,7 +219,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
             // Receive an unknown transaction
             case None =>
               if (balance < amount) {
-                val event = BalanceShorted(transactionId)
+                val event = BalanceShorted(lastAppliedEventNo.next, transactionId)
                 Effect
                   .replicate[DomainEvent, Account](event)
                   .thenRun(logEvent(event, logger)(_))
@@ -192,6 +227,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
               } else {
                 val event = Withdrew(
                   accountNo,
+                  lastAppliedEventNo.next,
                   transactionId,
                   amount,
                   balance - amount,
@@ -248,7 +284,8 @@ object BankAccountBehavior extends AppTypedActorLogging {
           Effect.reply(replyTo)(InvalidRefundCommand())
         case None =>
           if (refundAmount <= 0) {
-            val event = InvalidRefundRequested(transactionId, withdrawalTransactionId, refundAmount)
+            val event =
+              InvalidRefundRequested(lastAppliedEventNo.next, transactionId, withdrawalTransactionId, refundAmount)
             Effect
               .replicate[DomainEvent, Account](event)
               .thenRun(logEvent(event, logger)(_))
@@ -256,6 +293,7 @@ object BankAccountBehavior extends AppTypedActorLogging {
           } else {
             val event = Refunded(
               accountNo,
+              lastAppliedEventNo.next,
               transactionId,
               withdrawalTransactionId,
               refundAmount,
@@ -270,16 +308,35 @@ object BankAccountBehavior extends AppTypedActorLogging {
       }
     }
 
-    def applyEvent(event: DomainEvent): Account =
+    def applyEvent(event: DomainEvent): Account = {
+      require(
+        event.eventNo === lastAppliedEventNo.next,
+        s"The event number of the event [${event.toString}] should be equal to the applied event number [${lastAppliedEventNo.toString}] plus one",
+      )
       event match {
-        case Deposited(_, transactionId, _, newBalance, _) => withBalance(newBalance).recordEvent(transactionId, event)
-        case BalanceExceeded(transactionId)                => recordEvent(transactionId, event)
-        case Withdrew(_, transactionId, _, newBalance, _)  => withBalance(newBalance).recordEvent(transactionId, event)
-        case BalanceShorted(transactionId)                 => recordEvent(transactionId, event)
-        case Refunded(_, transactionId, _, _, newBalance, _) =>
-          withBalance(newBalance).recordEvent(transactionId, event)
-        case InvalidRefundRequested(transactionId, _, _) => recordEvent(transactionId, event)
+        case Deposited(_, _, transactionId, _, newBalance, _) =>
+          withLastAppliedEventNo(event.eventNo)
+            .withBalance(newBalance)
+            .recordEvent(transactionId, event)
+        case BalanceExceeded(_, transactionId) =>
+          withLastAppliedEventNo(event.eventNo)
+            .recordEvent(transactionId, event)
+        case Withdrew(_, _, transactionId, _, newBalance, _) =>
+          withLastAppliedEventNo(event.eventNo)
+            .withBalance(newBalance)
+            .recordEvent(transactionId, event)
+        case BalanceShorted(_, transactionId) =>
+          withLastAppliedEventNo(event.eventNo)
+            .recordEvent(transactionId, event)
+        case Refunded(_, _, transactionId, _, _, newBalance, _) =>
+          withLastAppliedEventNo(event.eventNo)
+            .withBalance(newBalance)
+            .recordEvent(transactionId, event)
+        case InvalidRefundRequested(_, transactionId, _, _) =>
+          withLastAppliedEventNo(event.eventNo)
+            .recordEvent(transactionId, event)
       }
+    }
 
     private[this] def logEvent(event: DomainEvent, logger: AppLogger)(
         state: Account,
@@ -315,7 +372,12 @@ object BankAccountBehavior extends AppTypedActorLogging {
       context.setReceiveTimeout(1.minute, ReceiveTimeout())
       ReplicatedEntityBehavior[Command, DomainEvent, Account](
         entityContext,
-        emptyState = Account(AccountNo(entityContext.entityId), BigInt(0), ListMap()),
+        emptyState = Account(
+          AccountNo(entityContext.entityId),
+          lastAppliedEventNo = EventNo(0),
+          balance = BigInt(0),
+          recentTransactions = ListMap(),
+        ),
         commandHandler = (state, cmd) => state.applyCommand(cmd, logger),
         eventHandler = (state, evt) => state.applyEvent(evt),
       ).withStopMessage(Stop())

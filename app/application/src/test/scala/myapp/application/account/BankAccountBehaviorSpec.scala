@@ -5,6 +5,7 @@ import lerna.akka.entityreplication.typed.testkit.ReplicatedEntityBehaviorTestKi
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
 import myapp.adapter.account.TransactionId
+import myapp.application.account.BankAccountBehavior.DomainEvent.EventNo
 import myapp.utility.AppRequestContext
 import myapp.utility.tenant.TenantA
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -112,6 +113,29 @@ class BankAccountBehaviorSpec
       depositResultWithInvalidId.hasNoEvents should be(true)
     }
 
+    "replicate a Deposited event with `lastAppliedEventNo` plus one" in {
+      val result1 = bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      result1.eventOfType[Deposited].eventNo should be(EventNo(1))
+      result1.state.lastAppliedEventNo should be(EventNo(1))
+
+      val result2 = bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("2"), amount = 1000, _))
+      result2.eventOfType[Deposited].eventNo should be(EventNo(2))
+      result2.state.lastAppliedEventNo should be(EventNo(2))
+    }
+
+    "replicate a BalanceExceeded event with `lastAppliedEVentNo` plus one" in {
+      val balanceMaxLimit = BankAccountBehavior.BalanceMaxLimit
+      val resultOfDepositingMaxAmount =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = balanceMaxLimit, _))
+      resultOfDepositingMaxAmount.eventOfType[Deposited].eventNo should be(EventNo(1))
+      resultOfDepositingMaxAmount.state.lastAppliedEventNo should be(EventNo(1))
+
+      val resultOfExcessBalance =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("2"), amount = 1, _))
+      resultOfExcessBalance.eventOfType[BalanceExceeded].eventNo should be(EventNo(2))
+      resultOfExcessBalance.state.lastAppliedEventNo should be(EventNo(2))
+    }
+
     "decrease a balance when it receives Withdraw" in {
       val transactionId1 = TransactionId("1")
       val result1        = bankAccountTestKit.runCommand[DepositReply](Deposit(transactionId1, amount = 3000, _))
@@ -174,6 +198,28 @@ class BankAccountBehaviorSpec
       val withdrawalResultWithInvalidId =
         bankAccountTestKit.runCommand[WithdrawReply](Withdraw(initialDepositId, amount = 400, _))
       withdrawalResultWithInvalidId.hasNoEvents should be(true)
+    }
+
+    "replicate a Withdrew event with `lastAppliedEventNo` plus one" in {
+      bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 3000, _))
+
+      val result2 = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(TransactionId("2"), amount = 1000, _))
+      result2.eventOfType[Withdrew].eventNo should be(EventNo(2))
+      result2.state.lastAppliedEventNo should be(EventNo(2))
+
+      val result3 = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(TransactionId("3"), amount = 2000, _))
+      result3.eventOfType[Withdrew].eventNo should be(EventNo(3))
+      result3.state.lastAppliedEventNo should be(EventNo(3))
+    }
+
+    "replicate a BalanceShorted event with `lastAppliedEventNo` plus one" in {
+      val result1 = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(TransactionId("1"), amount = 5000, _))
+      result1.eventOfType[BalanceShorted].eventNo should be(EventNo(1))
+      result1.state.lastAppliedEventNo should be(EventNo(1))
+
+      val result2 = bankAccountTestKit.runCommand[WithdrawReply](Withdraw(TransactionId("2"), amount = 5000, _))
+      result2.eventOfType[BalanceShorted].eventNo should be(EventNo(2))
+      result2.state.lastAppliedEventNo should be(EventNo(2))
     }
 
     "return a current balance when it receives GetBalance" in {
@@ -451,6 +497,47 @@ class BankAccountBehaviorSpec
       refundResult.hasNoEvents should be(true)
       refundResult.replyOfType[InvalidRefundCommand]
 
+    }
+
+    "replicate a Refunded event with `lastAppliedEventNo` plus one" in {
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.state.lastAppliedEventNo should be(EventNo(1))
+
+      val withdrawalId     = TransactionId("2")
+      val withdrawalAmount = 300
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = withdrawalAmount, _))
+      withdrawalResult.state.lastAppliedEventNo should be(EventNo(2))
+
+      val refundAmount  = withdrawalAmount
+      val refundContext = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(TransactionId("3"), withdrawalId, refundAmount, _)(refundContext),
+        )
+      refundResult.eventOfType[Refunded].eventNo should be(EventNo(3))
+      refundResult.state.lastAppliedEventNo should be(EventNo(3))
+    }
+
+    "replicate an InvalidRefundRequested event with `lastAppliedEventNo` plus one" in {
+      val initialDepositResult =
+        bankAccountTestKit.runCommand[DepositReply](Deposit(TransactionId("1"), amount = 1000, _))
+      initialDepositResult.state.lastAppliedEventNo should be(EventNo(1))
+
+      val withdrawalId = TransactionId("2")
+      val withdrawalResult =
+        bankAccountTestKit.runCommand[WithdrawReply](Withdraw(withdrawalId, amount = 300, _))
+      withdrawalResult.state.lastAppliedEventNo should be(EventNo(2))
+
+      val negativeRefundAmount = -1
+      val refundContext        = AppRequestContext(generateRandomTraceId(), tenant)
+      val refundResult =
+        bankAccountTestKit.runCommand[RefundReply](
+          Refund(TransactionId("3"), withdrawalId, negativeRefundAmount, _)(refundContext),
+        )
+      refundResult.eventOfType[InvalidRefundRequested].eventNo should be(EventNo(3))
+      refundResult.state.lastAppliedEventNo should be(EventNo(3))
     }
 
   }

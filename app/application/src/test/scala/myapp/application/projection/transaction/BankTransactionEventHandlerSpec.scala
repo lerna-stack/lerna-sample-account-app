@@ -12,6 +12,7 @@ import lerna.testkit.airframe.DISessionSupport
 import lerna.testkit.akka.ScalaTestWithTypedActorTestKit
 import lerna.util.trace.TraceId
 import myapp.adapter.account.{ AccountNo, TransactionId }
+import myapp.application.account.BankAccountBehavior.DomainEvent.EventNo
 import myapp.application.account.BankAccountBehavior.{ Deposited, DomainEvent, Refunded, Withdrew }
 import myapp.application.projection.AppEventHandler.BehaviorSetup
 import myapp.readmodel.{ JDBCSupport, ReadModeDIDesign }
@@ -61,11 +62,11 @@ class BankTransactionEventHandlerSpec
 
       val accountNo = AccountNo("1")
       val events: Vector[DomainEvent] = Vector[DomainEvent](
-        Deposited(accountNo, TransactionId("id0"), BigInt(100000), 100000, 0L),
-        Withdrew(accountNo, TransactionId("id1"), BigInt(5000), 95000, 0L),
-        Withdrew(accountNo, TransactionId("id2"), BigInt(10000), 85000, 0L),
-        Refunded(accountNo, TransactionId("id3"), TransactionId("id2"), BigInt(2000), 87000, 0L),
-        Deposited(accountNo, TransactionId("id4"), BigInt(200000), 287000, 0L),
+        Deposited(accountNo, EventNo(1), TransactionId("id0"), BigInt(100000), 100000, 0L),
+        Withdrew(accountNo, EventNo(2), TransactionId("id1"), BigInt(5000), 95000, 0L),
+        Withdrew(accountNo, EventNo(3), TransactionId("id2"), BigInt(10000), 85000, 0L),
+        Refunded(accountNo, EventNo(4), TransactionId("id3"), TransactionId("id2"), BigInt(2000), 87000, 0L),
+        Deposited(accountNo, EventNo(5), TransactionId("id4"), BigInt(200000), 287000, 0L),
       )
 
       val envelopedEvents: Vector[EventEnvelope[DomainEvent]] = events.zipWithIndex.map {
