@@ -7,6 +7,9 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 ## [Unreleased]
 [Unreleased]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2022.3.0...main
 
+### Added
+- `BankAccountBehavior` にデータ不整合検出を実装しました [PR#47](https://github.com/lerna-stack/lerna-sample-account-app/pull/47)
+
 
 ## [v2022.3.0] - 2022-3-25
 [v2022.3.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2021.10.0...v2022.3.0
