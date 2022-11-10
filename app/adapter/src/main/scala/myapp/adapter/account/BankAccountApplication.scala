@@ -130,6 +130,12 @@ object BankAccountApplication {
       */
     case object Timeout extends FetchBalanceResult
 
+    /** 残高照会失敗: メンテナンス中
+      *
+      * 口座番号に紐づくRaftアクターがメンテナンス中の際に発生する。
+      */
+    case object UnderMaintenance extends FetchBalanceResult
+
   }
 
   /** 入金結果 */
@@ -157,6 +163,11 @@ object BankAccountApplication {
       */
     case object Timeout extends DepositResult
 
+    /** 残高照会失敗: メンテナンス中
+      *
+      * 口座番号に紐づくRaftアクターがメンテナンス中の際に発生する。
+      */
+    case object UnderMaintenance extends DepositResult
   }
 
   /** 出金結果 */
@@ -184,6 +195,11 @@ object BankAccountApplication {
       */
     case object Timeout extends WithdrawalResult
 
+    /** 残高照会失敗: メンテナンス中
+      *
+      * 口座番号に紐づくRaftアクターがメンテナンス中の際に発生する。
+      */
+    case object UnderMaintenance extends WithdrawalResult
   }
 
   /** 返金結果 */
@@ -216,6 +232,11 @@ object BankAccountApplication {
       */
     case object Timeout extends RefundResult
 
+    /** 残高照会失敗: メンテナンス中
+      *
+      * 口座番号に紐づくRaftアクターがメンテナンス中の際に発生する。
+      */
+    case object UnderMaintenance extends RefundResult
   }
 
 }
