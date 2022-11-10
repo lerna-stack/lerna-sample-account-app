@@ -145,9 +145,10 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
     }
 
     "return ServiceUnavailable if the account is under maintenance against the fetch balance request" in {
-      fetchBalance.expects(where { (accountNo, context) =>
-        accountNo === AccountNo("123-456") && context.tenant === TenantA
-      }).returns(Future.successful(FetchBalanceResult.UnderMaintenance))
+      fetchBalance
+        .expects(where { (accountNo, context) =>
+          accountNo === AccountNo("123-456") && context.tenant === TenantA
+        }).returns(Future.successful(FetchBalanceResult.UnderMaintenance))
 
       Get("/accounts/123-456").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
         expect(status === StatusCodes.ServiceUnavailable)
