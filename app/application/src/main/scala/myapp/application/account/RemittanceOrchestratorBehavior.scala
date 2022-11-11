@@ -662,7 +662,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logEvent(newState, this, balanceShorted)
                 context.self ! CompleteTransaction
               }
-          case WithdrawalResult.Timeout =>
+          case WithdrawalResult.Timeout | WithdrawalResult.UnderMaintenance =>
             Effect.none.thenRun { state: State =>
               val delay = context.settings.withdrawalRetryDelay
               context.logWarn(
@@ -791,7 +791,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logEvent(newState, this, balanceExceeded)
                 context.self ! RefundToSource
               }
-          case DepositResult.Timeout =>
+          case DepositResult.Timeout | DepositResult.UnderMaintenance =>
             Effect.none.thenRun { state: State =>
               val delay = context.settings.depositRetryDelay
               context.logWarn(
@@ -938,7 +938,7 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logError(state, message)
                 context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }
-          case RefundResult.Timeout =>
+          case RefundResult.Timeout | RefundResult.UnderMaintenance =>
             Effect.none
               .thenRun { state: State =>
                 val delay = context.settings.refundRetryDelay

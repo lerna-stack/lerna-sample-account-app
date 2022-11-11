@@ -518,6 +518,54 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
+      "retry withdrawal several times due to under maintenance, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
+
+        val failureLimit           = 3
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(WithdrawalResult.UnderMaintenance))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .withdraw(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(WithdrawalResult.Succeeded(0)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          createEventSourcedBehaviorTestKitWithSelfProbe(withdrawingFromSource, bankAccountApplication)
+
+        // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
+        LoggingTestKit
+          .warn("Withdrawal failed due to a timeout.")
+          .withOccurrences(failureLimit)
+          .expect {
+
+            orchestrator.runCommand(WithdrawFromSource)
+
+            selfProbe.expectMessage(DepositToDestination)
+            inside(orchestrator.persistenceTestKit.expectNextPersistedType[WithdrawalSucceeded](persistenceId.id)) {
+              event =>
+                expect(event.appRequestContext === appRequestContext)
+                expect(event.accountNo === sourceAccountNo)
+                expect(event.transactionId === withdrawalTransactionId)
+                expect(event.amount === remittanceAmount)
+            }
+            inside(orchestrator.getState()) {
+              case state: State.DepositingToDestination =>
+                expect(state.appRequestContext === appRequestContext)
+                expect(state.sourceAccountNo === sourceAccountNo)
+                expect(state.destinationAccountNo === destinationAccountNo)
+                expect(state.remittanceAmount === remittanceAmount)
+                expect(state.withdrawalTransactionId === withdrawalTransactionId)
+                expect(state.depositTransactionId === depositTransactionId)
+                expect(state.refundTransactionId === refundTransactionId)
+            }
+
+          }
+
+      }
+
       "retry withdrawal several times due to an unexpected exception, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
@@ -729,6 +777,52 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
+      "retry deposit several times due to under maintenance, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
+        val failureLimit           = 3
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.UnderMaintenance))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .deposit(_: AccountNo, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(destinationAccountNo, depositTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(DepositResult.Succeeded(1)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          createEventSourcedBehaviorTestKitWithSelfProbe(depositingToDestination, bankAccountApplication)
+
+        // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
+        LoggingTestKit
+          .warn("Deposit failed due to a timeout.")
+          .withOccurrences(failureLimit)
+          .expect {
+
+            orchestrator.runCommand(DepositToDestination)
+
+            selfProbe.expectMessage(CompleteTransaction)
+            inside(orchestrator.persistenceTestKit.expectNextPersistedType[DepositSucceeded](persistenceId.id)) {
+              event =>
+                expect(event.appRequestContext === appRequestContext)
+                expect(event.accountNo === destinationAccountNo)
+                expect(event.transactionId === depositTransactionId)
+                expect(event.amount === remittanceAmount)
+            }
+            inside(orchestrator.getState()) {
+              case state: State.Succeeded =>
+                expect(state.appRequestContext === appRequestContext)
+                expect(state.sourceAccountNo === sourceAccountNo)
+                expect(state.destinationAccountNo === destinationAccountNo)
+                expect(state.remittanceAmount === remittanceAmount)
+                expect(state.withdrawalTransactionId === withdrawalTransactionId)
+                expect(state.depositTransactionId === depositTransactionId)
+                expect(state.refundTransactionId === refundTransactionId)
+            }
+
+          }
+      }
+
       "retry deposit several times due to an unexpected exception, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
         // NOTE: We might not be able to recover this failure automatically.
         // This test supposes that this failure will recover eventually by human operation.
@@ -910,6 +1004,54 @@ final class RemittanceOrchestratorBehaviorSpec
 
           }
 
+      }
+
+      "retry refund several times due to under maintenance, succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
+        val failureLimit           = 3
+        val bankAccountApplication = mock[BankAccountApplication]
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.UnderMaintenance))
+          .repeat(failureLimit)
+        (bankAccountApplication
+          .refund(_: AccountNo, _: TransactionId, _: TransactionId, _: BigInt)(_: AppRequestContext))
+          .expects(sourceAccountNo, refundTransactionId, withdrawalTransactionId, remittanceAmount, appRequestContext)
+          .returns(Future.successful(RefundResult.Succeeded(remittanceAmount)))
+
+        val (orchestrator, persistenceId, selfProbe) =
+          createEventSourcedBehaviorTestKitWithSelfProbe(refundingToSource, bankAccountApplication)
+
+        // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
+        LoggingTestKit
+          .warn("Refund failed due to a timeout.")
+          .withOccurrences(failureLimit)
+          .expect {
+
+            orchestrator.runCommand(RefundToSource)
+
+            selfProbe.expectMessage(CompleteTransaction)
+            inside(orchestrator.persistenceTestKit.expectNextPersistedType[RefundSucceeded](persistenceId.id)) {
+              event =>
+                expect(event.appRequestContext === appRequestContext)
+                expect(event.accountNo === sourceAccountNo)
+                expect(event.transactionId === refundTransactionId)
+                expect(event.withdrawalTransactionId === withdrawalTransactionId)
+                expect(event.amount === remittanceAmount)
+            }
+            inside(orchestrator.getState()) {
+              case state: State.Failed =>
+                expect(state.appRequestContext === appRequestContext)
+                expect(state.sourceAccountNo === sourceAccountNo)
+                expect(state.destinationAccountNo === destinationAccountNo)
+                expect(state.remittanceAmount === remittanceAmount)
+                expect(state.withdrawalTransactionId === withdrawalTransactionId)
+                expect(state.depositTransactionId === depositTransactionId)
+                expect(state.refundTransactionId === refundTransactionId)
+                expect(state.failureReply === ExcessBalance)
+            }
+
+          }
       }
 
       "retry refund several times due to invalid argument(s), succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
