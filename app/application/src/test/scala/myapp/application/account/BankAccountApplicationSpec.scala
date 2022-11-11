@@ -18,6 +18,13 @@ import myapp.utility.scalatest.StandardSpec
 import myapp.utility.tenant.TenantA
 import wvlet.airframe.{ newDesign, Design }
 
+// Airframe が生成するコードを Wartremover が誤検知してしまうため
+@SuppressWarnings(
+  Array(
+    "org.wartremover.contrib.warts.MissingOverride",
+    "org.wartremover.warts.Equals",
+  ),
+)
 class BankAccountApplicationSpec extends ScalaTestWithTypedActorTestKit() with StandardSpec with DISessionSupport {
   override protected val diDesign: Design = newDesign
     .bind[Config].toInstance(
