@@ -13,7 +13,7 @@ import myapp.utility.tenant.AppTenant
 import java.util.concurrent.TimeoutException
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters.ListHasAsScala
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Nothing])
     extends BankAccountApplication
@@ -23,6 +23,12 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
 
   private[this] val replication = ClusterReplication(system)
   AppTenant.values.foreach { implicit tenant =>
+    val disableShards = root.getStringList(s"akka-entity-replication.raft.disable-shards-${tenant.id}").asScala.toSet
+    val stickyLeaders = root
+      .getConfig(s"akka-entity-replication.raft.sticky-leaders-${tenant.id}").entrySet.asScala.map(e =>
+        e.getKey -> e.getValue.unwrapped.toString,
+      ).toMap
+
     val settings = ClusterReplicationSettings(system)
       .withRaftJournalPluginId(s"akka-entity-replication.raft.persistence.cassandra-${tenant.id}.journal")
       .withRaftSnapshotPluginId(s"akka-entity-replication.raft.persistence.cassandra-${tenant.id}.snapshot")
@@ -33,6 +39,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       .withEventSourcedSnapshotStorePluginId(
         s"akka-entity-replication.eventsourced.persistence.cassandra-${tenant.id}.snapshot",
       )
+      .withDisabledShards(disableShards)
+      .withStickyLeaders(stickyLeaders)
 
     val entity = ReplicatedEntity(BankAccountBehavior.typeKey)(context => BankAccountBehavior(context))
       .withSettings(settings)
@@ -44,8 +52,16 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
 
   private[this] val retryInterval: FiniteDuration = 300.milliseconds
 
-  private val underMaintenanceShards =
-    root.getConfig("myapp.application.lerna").getStringList("under-maintenance-shards").asScala.toSet
+  private val underMaintenanceShards: Map[AppTenant, Set[String]] = {
+    AppTenant.values
+      .map(tenant =>
+        tenant -> root
+          .getConfig("myapp.application.lerna").getStringList(s"under-maintenance-shards-${tenant.id}").asScala.toSet,
+      ).toMap
+  }
+
+  private def isUnderMaintenance(shardId: String)(implicit tenant: AppTenant) =
+    underMaintenanceShards.get(tenant).fold(false)(_.contains(shardId))
 
   private[this] def entityRef(accountNo: AccountNo)(implicit tenant: AppTenant) =
     replication.entityRefFor(BankAccountBehavior.typeKey, accountNo.value)
@@ -54,7 +70,7 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       accountNo: AccountNo,
   )(implicit appRequestContext: AppRequestContext): Future[FetchBalanceResult] = {
     val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (underMaintenanceShards.contains(shardId)) {
+    if (isUnderMaintenance(shardId)) {
       logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
       Future.successful(FetchBalanceResult.UnderMaintenance)
     } else {
@@ -75,7 +91,7 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[DepositResult] = {
     val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (underMaintenanceShards.contains(shardId)) {
+    if (isUnderMaintenance(shardId)) {
       logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
       Future.successful(DepositResult.UnderMaintenance)
     } else {
@@ -99,7 +115,7 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[WithdrawalResult] = {
     val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (underMaintenanceShards.contains(shardId)) {
+    if (isUnderMaintenance(shardId)) {
       logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
       Future.successful(WithdrawalResult.UnderMaintenance)
     } else {
@@ -124,7 +140,7 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BankAccountApplication.RefundResult] = {
     val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (underMaintenanceShards.contains(shardId)) {
+    if (isUnderMaintenance(shardId)) {
       logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
       Future.successful(RefundResult.UnderMaintenance)
     } else {
