@@ -31,7 +31,7 @@ class BankAccountApplicationSpec extends ScalaTestWithTypedActorTestKit() with S
       ConfigFactory
         .parseString(s"""
          | // 90はAccountNo("123")から算出されるshard id
-         | myapp.application.lerna.under-maintenance-shards = ["90"]
+         | myapp.application.lerna.under-maintenance-shards-tenant-a = ["90"]
          |""".stripMargin)
         .withFallback(testKit.config),
     )
