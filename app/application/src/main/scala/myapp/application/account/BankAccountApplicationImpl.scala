@@ -24,10 +24,11 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
   private[this] val replication = ClusterReplication(system)
   AppTenant.values.foreach { implicit tenant =>
     val disableShards = root.getStringList(s"akka-entity-replication.raft.disable-shards-${tenant.id}").asScala.toSet
-    val stickyLeaders = root
-      .getConfig(s"akka-entity-replication.raft.sticky-leaders-${tenant.id}").entrySet.asScala.map(e =>
-        e.getKey -> e.getValue.unwrapped.toString,
-      ).toMap
+    val stickyLeaders = {
+      val config = root.getConfig(s"akka-entity-replication.raft.sticky-leaders-${tenant.id}")
+      val keys   = config.entrySet.asScala.map(_.getKey)
+      keys.map(key => key -> config.getString(key)).toMap
+    }
 
     val settings = ClusterReplicationSettings(system)
       .withRaftJournalPluginId(s"akka-entity-replication.raft.persistence.cassandra-${tenant.id}.journal")
