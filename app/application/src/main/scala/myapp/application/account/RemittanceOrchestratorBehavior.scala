@@ -662,12 +662,21 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logEvent(newState, this, balanceShorted)
                 context.self ! CompleteTransaction
               }
-          case WithdrawalResult.Timeout | WithdrawalResult.UnderMaintenance =>
+          case WithdrawalResult.Timeout =>
             Effect.none.thenRun { state: State =>
               val delay = context.settings.withdrawalRetryDelay
               context.logWarn(
                 state,
                 s"Withdrawal failed due to a timeout. This will retry withdrawal again after ${delay.toString}",
+              )
+              context.timers.startSingleTimer(TimerKeys.RetryWithdraw, WithdrawFromSource, delay)
+            }
+          case WithdrawalResult.UnderMaintenance =>
+            Effect.none.thenRun { state: State =>
+              val delay = context.settings.withdrawalRetryDelay
+              context.logWarn(
+                state,
+                s"Withdrawal failed due to maintenance. This will retry withdrawal again after ${delay.toString}",
               )
               context.timers.startSingleTimer(TimerKeys.RetryWithdraw, WithdrawFromSource, delay)
             }
@@ -791,12 +800,21 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logEvent(newState, this, balanceExceeded)
                 context.self ! RefundToSource
               }
-          case DepositResult.Timeout | DepositResult.UnderMaintenance =>
+          case DepositResult.Timeout =>
             Effect.none.thenRun { state: State =>
               val delay = context.settings.depositRetryDelay
               context.logWarn(
                 state,
                 s"Deposit failed due to a timeout. This will retry deposit again after ${delay.toString}.",
+              )
+              context.timers.startSingleTimer(TimerKeys.RetryDeposit, DepositToDestination, delay)
+            }
+          case DepositResult.UnderMaintenance =>
+            Effect.none.thenRun { state: State =>
+              val delay = context.settings.depositRetryDelay
+              context.logWarn(
+                state,
+                s"Deposit failed due to maintenance. This will retry deposit again after ${delay.toString}.",
               )
               context.timers.startSingleTimer(TimerKeys.RetryDeposit, DepositToDestination, delay)
             }
@@ -938,13 +956,23 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logError(state, message)
                 context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }
-          case RefundResult.Timeout | RefundResult.UnderMaintenance =>
+          case RefundResult.Timeout =>
             Effect.none
               .thenRun { state: State =>
                 val delay = context.settings.refundRetryDelay
                 context.logWarn(
                   state,
                   s"Refund failed due to a timeout. This will retry refund again after ${delay.toString}.",
+                )
+                context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
+              }
+          case RefundResult.UnderMaintenance =>
+            Effect.none
+              .thenRun { state: State =>
+                val delay = context.settings.refundRetryDelay
+                context.logWarn(
+                  state,
+                  s"Refund failed due to maintenance. This will retry refund again after ${delay.toString}.",
                 )
                 context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }

@@ -518,7 +518,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
-      "retry withdrawal several times due to under maintenance, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
+      "retry withdrawal several times due to maintenance, succeed the withdrawal, persist a WithdrawalSucceeded event, and then move to a DepositingToDestination state" in {
 
         val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
@@ -537,7 +537,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
-          .warn("Withdrawal failed due to a timeout.")
+          .warn("Withdrawal failed due to maintenance.")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -777,7 +777,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
-      "retry deposit several times due to under maintenance, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
+      "retry deposit several times due to maintenance, succeed the deposit, persist a DepositSucceeded event, and then move to a Succeeded state" in {
         val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
@@ -795,7 +795,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
-          .warn("Deposit failed due to a timeout.")
+          .warn("Deposit failed due to maintenance.")
           .withOccurrences(failureLimit)
           .expect {
 
@@ -1006,7 +1006,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
       }
 
-      "retry refund several times due to under maintenance, succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
+      "retry refund several times due to maintenance, succeed the refund, persist a RefundSucceeded event, and then move to a Failed state" in {
         val failureLimit           = 3
         val bankAccountApplication = mock[BankAccountApplication]
         (bankAccountApplication
@@ -1024,7 +1024,7 @@ final class RemittanceOrchestratorBehaviorSpec
 
         // NOTE: Warn logs are crucial; This test should verify warn logs are actually written.
         LoggingTestKit
-          .warn("Refund failed due to a timeout.")
+          .warn("Refund failed due to maintenance.")
           .withOccurrences(failureLimit)
           .expect {
 
