@@ -61,8 +61,13 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       ).toMap
   }
 
-  private def isUnderMaintenance(shardId: String)(implicit tenant: AppTenant) =
+  private def isUnderMaintenance(accountNo: AccountNo)(implicit tenant: AppTenant) = {
+    val shardId = shardIdOf(accountNo)
     underMaintenanceShards.get(tenant).fold(false)(_.contains(shardId))
+  }
+
+  private def shardIdOf(accountNo: AccountNo)(implicit tenant: AppTenant) =
+    replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
 
   private[this] def entityRef(accountNo: AccountNo)(implicit tenant: AppTenant) =
     replication.entityRefFor(BankAccountBehavior.typeKey, accountNo.value)
@@ -70,9 +75,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
   override def fetchBalance(
       accountNo: AccountNo,
   )(implicit appRequestContext: AppRequestContext): Future[FetchBalanceResult] = {
-    val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (isUnderMaintenance(shardId)) {
-      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
+    if (isUnderMaintenance(accountNo)) {
+      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardIdOf(accountNo))
       Future.successful(FetchBalanceResult.UnderMaintenance)
     } else {
       AtLeastOnceComplete
@@ -91,9 +95,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       transactionId: TransactionId,
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[DepositResult] = {
-    val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (isUnderMaintenance(shardId)) {
-      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
+    if (isUnderMaintenance(accountNo)) {
+      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardIdOf(accountNo))
       Future.successful(DepositResult.UnderMaintenance)
     } else {
       AtLeastOnceComplete
@@ -115,9 +118,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       transactionId: TransactionId,
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[WithdrawalResult] = {
-    val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (isUnderMaintenance(shardId)) {
-      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
+    if (isUnderMaintenance(accountNo)) {
+      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardIdOf(accountNo))
       Future.successful(WithdrawalResult.UnderMaintenance)
     } else {
       AtLeastOnceComplete
@@ -140,9 +142,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
       withdrawalTransactionId: TransactionId,
       amount: BigInt,
   )(implicit appRequestContext: AppRequestContext): Future[BankAccountApplication.RefundResult] = {
-    val shardId = replication.shardIdOf(BankAccountBehavior.typeKey, accountNo.value)
-    if (isUnderMaintenance(shardId)) {
-      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardId)
+    if (isUnderMaintenance(accountNo)) {
+      logger.warn("The raft actor(shard id = {}) is under maintenance.", shardIdOf(accountNo))
       Future.successful(RefundResult.UnderMaintenance)
     } else {
       val refundCommand = BankAccountBehavior.Refund(transactionId, withdrawalTransactionId, amount, _)
