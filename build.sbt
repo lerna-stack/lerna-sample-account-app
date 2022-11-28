@@ -197,6 +197,24 @@ lazy val `entrypoint` =
       ),
     )
 
+lazy val `data-viewer` =
+  (project in file("app/data-viewer"))
+    .enablePlugins(JavaAppPackaging)
+    .dependsOn(
+      `application`,
+      `testkit` % "test",
+    )
+    .settings(wartremoverSettings, coverageSettings)
+    .settings(
+      name := "data-viewer",
+      mainClass in Compile := Some("myapp.dataviewer.DataViewerServer"),
+      libraryDependencies ++= Seq(
+        AkkaHttp.http,
+        AkkaHttp.sprayJson,
+        Akka.actorTestKit   % Test,
+      ),
+    )
+
 lazy val `testkit` = (project in file("app/testkit"))
   .settings(wartremoverSettings, coverageSettings)
   .settings(
