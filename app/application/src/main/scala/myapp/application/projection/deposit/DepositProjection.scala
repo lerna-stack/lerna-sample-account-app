@@ -84,7 +84,7 @@ class DepositProjection(
               case DepositResult.ExcessBalance =>
                 logger.error("Deposit failed due to an excess balance: request={}", request)
                 FutureDone
-              case DepositResult.Timeout =>
+              case DepositResult.Timeout | DepositResult.UnderMaintenance =>
                 val cause = new BankAccountApplicationUnavailable(
                   s"Deposit failed due to the service being unavailable: request=${request.toString}",
                 )

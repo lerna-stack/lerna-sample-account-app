@@ -144,6 +144,18 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return ServiceUnavailable if the account is under maintenance against the fetch balance request" in {
+      fetchBalance
+        .expects(where { (accountNo, context) =>
+          accountNo === AccountNo("123-456") && context.tenant === TenantA
+        }).returns(Future.successful(FetchBalanceResult.UnderMaintenance))
+
+      Get("/accounts/123-456").withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+        expect(responseAs[String] === "The shard id of AccountNo(123-456) is now under maintenance.")
+      }
+    }
+
     "deposit the given amount into the account and then return the account balance" in {
 
       deposit
@@ -224,6 +236,20 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
 
     }
 
+    "return ServiceUnavailable if the account is under maintenance against the deposit request" in {
+      deposit
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(DepositResult.UnderMaintenance))
+
+      Post("/accounts/123-456/deposit?transactionId=deposit1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+        expect(responseAs[String] === "The shard id of AccountNo(123-456) is now under maintenance.")
+      }
+    }
+
     "withdraw the given amount from the account and then return the account balance" in {
 
       withdraw
@@ -301,6 +327,20 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
       }
     }
 
+    "return ServiceUnavailable if the account is under maintenance against the withdrawal request" in {
+      withdraw
+        .expects(where { (accountNo, _, _, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA
+        }).returns(Future.successful(WithdrawalResult.UnderMaintenance))
+
+      Post("/accounts/123-456/withdraw?transactionId=withdraw1&amount=40")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+        expect(responseAs[String] === "The shard id of AccountNo(123-456) is now under maintenance.")
+      }
+    }
+
     "refund the given amount into the account and then return the account balance" in {
 
       refund
@@ -354,6 +394,23 @@ class ApplicationRouteSpec extends StandardSpec with ScalatestRouteTest with Moc
         expect(status === StatusCodes.ServiceUnavailable)
       }
 
+    }
+
+    "return ServiceUnavailable if the account is under maintenance against the refund request" in {
+      refund
+        .expects(where { (accountNo, transactionId, withdrawalTransactionId, amount, context) =>
+          accountNo === AccountNo("123-456") &&
+          context.tenant === TenantA &&
+          transactionId === TransactionId("refund1") &&
+          withdrawalTransactionId === TransactionId("withdrawal1") &&
+          amount === BigInt(100)
+        }).returns(Future.successful(RefundResult.UnderMaintenance))
+
+      Put("/accounts/123-456/refund?transactionId=refund1&withdrawalTransactionId=withdrawal1&amount=100")
+        .withHeaders(tenantHeader(TenantA)) ~> route.route ~> check {
+        expect(status === StatusCodes.ServiceUnavailable)
+        expect(responseAs[String] === "The shard id of AccountNo(123-456) is now under maintenance.")
+      }
     }
 
     "return the account statement of the given account" in {
