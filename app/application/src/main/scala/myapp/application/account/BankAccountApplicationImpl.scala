@@ -23,7 +23,8 @@ class BankAccountApplicationImpl(root: Config)(implicit system: ActorSystem[Noth
 
   private[this] val replication = ClusterReplication(system)
   AppTenant.values.foreach { implicit tenant =>
-    val disableShards = root.getStringList(s"myapp.application.akka-entity-replication.raft.disable-shards-${tenant.id}").asScala.toSet
+    val disableShards =
+      root.getStringList(s"myapp.application.akka-entity-replication.raft.disable-shards-${tenant.id}").asScala.toSet
     val stickyLeaders = {
       val config = root.getConfig(s"myapp.application.akka-entity-replication.raft.sticky-leaders-${tenant.id}")
       val keys   = config.entrySet.asScala.map(_.getKey)
