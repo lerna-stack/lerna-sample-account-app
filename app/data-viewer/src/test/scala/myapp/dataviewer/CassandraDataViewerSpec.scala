@@ -2,12 +2,13 @@ package myapp.dataviewer
 
 import akka.Done
 import akka.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import akka.actor.typed.{ ActorRef, Behavior }
+import akka.actor.typed.ActorRef
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import akka.stream.scaladsl.Sink
 import myapp.utility.scalatest.SpecAssertions
 import org.scalatest.Inside
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration.DurationInt
@@ -22,7 +23,11 @@ object CassandraDataViewerSpec {
 
     final case class State(count: Int) extends JsonSerializable
 
-    def apply(persistenceId: PersistenceId, journalPluginId: String): Behavior[Command] =
+    def apply(
+        persistenceId: PersistenceId,
+        journalPluginId: String,
+        snapshotPluginId: String,
+    ): EventSourcedBehavior[Command, Event, State] =
       EventSourcedBehavior[Command, Event, State](
         persistenceId = persistenceId,
         emptyState = State(0),
@@ -34,7 +39,10 @@ object CassandraDataViewerSpec {
           evt match {
             case Saved(count) => state.copy(state.count + count)
           },
-      ).withJournalPluginId(journalPluginId)
+      )
+        .snapshotWhen((_, _, _) => true)
+        .withJournalPluginId(journalPluginId)
+        .withSnapshotPluginId(snapshotPluginId)
   }
 }
 
@@ -46,7 +54,7 @@ class CassandraDataViewerSpec extends ScalaTestWithActorTestKit() with SpecAsser
 
   "CassandraDataViewer.fetch" should {
     val persistenceId = PersistenceId.ofUniqueId(s"dummy-persistence-id-${System.currentTimeMillis().toString}")
-    val actor         = spawn(TestActor(persistenceId, s"$configPath.journal"))
+    val actor         = spawn(TestActor(persistenceId, s"$configPath.journal", s"$configPath.snapshot"))
 
     val count1 = 11
     val count2 = 44
@@ -76,6 +84,17 @@ class CassandraDataViewerSpec extends ScalaTestWithActorTestKit() with SpecAsser
           (2, Saved(count2)),
           (3, Saved(count3)),
         )
+      }
+    }
+
+    "return snapshots" in {
+      val sequenceNr: Long = 1
+      val persistenceType  = DataViewer.PersistenceType.Snapshot(persistenceId.id, sequenceNr)
+
+      val future = raftViewer.fetch(persistenceType).runWith(Sink.seq)
+
+      ScalaFutures.whenReady(future) { result =>
+        expect(result === List((1, State(11))))
       }
     }
   }
