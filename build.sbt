@@ -114,6 +114,7 @@ lazy val `application` = (project in file("app/application"))
   .settings(wartremoverSettings, coverageSettings)
   .settings(
     name := "application",
+    resolvers += Resolver.sonatypeRepo("snapshots"),
     libraryDependencies ++= Seq(
       Lerna.akkaEntityReplication,
       Lerna.utilSequence,

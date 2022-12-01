@@ -54,6 +54,9 @@ import scala.util.{ Failure, Success }
   *  - タイムアウト
   *    - APIが冪等であるためリトライする。
   *    - タイムアウトが発生した場合、API呼び出しの成否を判断できないため、必ずリトライしなくてはならない。
+  *  - メンテナンス中
+  *    - メンテナンス中でリクエストが失敗した場合は、口座の状態は変化していないことが保証されている。
+  *    - メンテナンス終了後に処理を再開できるようにリトライする。
   *  - 予期しない失敗
   *    - 例外発生などの予期しない例外の場合はリトライする。
   *    - タイムアウトと同様に、API呼び出しの成否を判断できないため、必ずリトライしなくてはならない。
@@ -671,6 +674,15 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               )
               context.timers.startSingleTimer(TimerKeys.RetryWithdraw, WithdrawFromSource, delay)
             }
+          case WithdrawalResult.UnderMaintenance =>
+            Effect.none.thenRun { state: State =>
+              val delay = context.settings.withdrawalRetryDelay
+              context.logWarn(
+                state,
+                s"Withdrawal failed due to maintenance. This will retry withdrawal again after ${delay.toString}",
+              )
+              context.timers.startSingleTimer(TimerKeys.RetryWithdraw, WithdrawFromSource, delay)
+            }
         }
       }
 
@@ -797,6 +809,15 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
               context.logWarn(
                 state,
                 s"Deposit failed due to a timeout. This will retry deposit again after ${delay.toString}.",
+              )
+              context.timers.startSingleTimer(TimerKeys.RetryDeposit, DepositToDestination, delay)
+            }
+          case DepositResult.UnderMaintenance =>
+            Effect.none.thenRun { state: State =>
+              val delay = context.settings.depositRetryDelay
+              context.logWarn(
+                state,
+                s"Deposit failed due to maintenance. This will retry deposit again after ${delay.toString}.",
               )
               context.timers.startSingleTimer(TimerKeys.RetryDeposit, DepositToDestination, delay)
             }
@@ -945,6 +966,16 @@ object RemittanceOrchestratorBehavior extends AppTypedActorLogging {
                 context.logWarn(
                   state,
                   s"Refund failed due to a timeout. This will retry refund again after ${delay.toString}.",
+                )
+                context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
+              }
+          case RefundResult.UnderMaintenance =>
+            Effect.none
+              .thenRun { state: State =>
+                val delay = context.settings.refundRetryDelay
+                context.logWarn(
+                  state,
+                  s"Refund failed due to maintenance. This will retry refund again after ${delay.toString}.",
                 )
                 context.timers.startSingleTimer(TimerKeys.RetryRefund, RefundToSource, delay)
               }

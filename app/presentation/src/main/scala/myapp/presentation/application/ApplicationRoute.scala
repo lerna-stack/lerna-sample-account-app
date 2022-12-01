@@ -62,6 +62,10 @@ class ApplicationRoute(
             complete(balance.toString + "\n")
           case FetchBalanceResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
+          case FetchBalanceResult.UnderMaintenance =>
+            complete(
+              StatusCodes.ServiceUnavailable -> s"The shard id of ${accountNo.toString} is now under maintenance.",
+            )
         }
       }
     }
@@ -94,6 +98,10 @@ class ApplicationRoute(
             complete(StatusCodes.BadRequest, "Excess Balance\n")
           case DepositResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
+          case DepositResult.UnderMaintenance =>
+            complete(
+              StatusCodes.ServiceUnavailable -> s"The shard id of ${accountNo.toString} is now under maintenance.",
+            )
         }
       }
     }
@@ -109,6 +117,10 @@ class ApplicationRoute(
             complete(StatusCodes.BadRequest, "Short Balance\n")
           case WithdrawalResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
+          case WithdrawalResult.UnderMaintenance =>
+            complete(
+              StatusCodes.ServiceUnavailable -> s"The shard id of ${accountNo.toString} is now under maintenance.",
+            )
         }
       }
     }
@@ -129,6 +141,10 @@ class ApplicationRoute(
             complete(StatusCodes.BadRequest)
           case RefundResult.Timeout =>
             complete(StatusCodes.ServiceUnavailable)
+          case RefundResult.UnderMaintenance =>
+            complete(
+              StatusCodes.ServiceUnavailable -> s"The shard id of ${accountNo.toString} is now under maintenance.",
+            )
         }
       }
     }
