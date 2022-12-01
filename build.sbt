@@ -211,7 +211,7 @@ lazy val `data-viewer` =
       libraryDependencies ++= Seq(
         AkkaHttp.http,
         AkkaHttp.sprayJson,
-        Akka.actorTestKit   % Test,
+        Akka.actorTestKit % Test,
       ),
     )
 
