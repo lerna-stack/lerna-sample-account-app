@@ -5,11 +5,18 @@ myapp に関する注目すべき変更はこのファイルで文書化され�
 このファイルの書き方に関する推奨事項については、[Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) を確認してください。
 
 ## [Unreleased]
-[Unreleased]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2022.3.0...main
+[Unreleased]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2022.12.0...main
+
+
+## [v2022.12.0] - 2022-12-26
+[v2022.12.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2022.3.0...v2022.12.0
 
 ### Added
 - `BankAccountBehavior` にデータ不整合検出を実装しました [PR#47](https://github.com/lerna-stack/lerna-sample-account-app/pull/47)
 - Raftアクターのメンテナンス時に必要な設定の追加と、メンテナンス中のRaftアクターにメッセージを送った際の挙動を実装しました [PR#48](https://github.com/lerna-stack/lerna-sample-account-app/pull/48)
+
+### Dependency Updates
+* akka-entity-replication 2.1.0 から 2.2.0 に更新しました
 
 ## [v2022.3.0] - 2022-3-25
 [v2022.3.0]: https://github.com/lerna-stack/lerna-sample-account-app/compare/v2021.10.0...v2022.3.0
