@@ -22,6 +22,7 @@ object Dependencies {
     val wireMock                 = "2.30.1"
     val scalaMock                = "5.1.0"
     val akkaManagement           = "1.0.10"
+    val pekko = "1.0.2"
   }
 
   object Lerna {
@@ -51,6 +52,10 @@ object Dependencies {
     val multiNodeTestKit     = "com.typesafe.akka" %% "akka-multi-node-testkit"     % Versions.akka
     val persistenceTestKit   = "com.typesafe.akka" %% "akka-persistence-testkit"    % Versions.akka
     val discovery            = "com.typesafe.akka" %% "akka-discovery"              % Versions.akka
+  }
+
+  object Pekko {
+    val actor = "org.apache.pekko" %% "pekko-actor-typed" % Versions.pekko
   }
 
   object AkkaHttp {

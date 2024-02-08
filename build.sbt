@@ -121,6 +121,7 @@ lazy val `application` = (project in file("app/application"))
       Lerna.management,
       Airframe.airframe,
       Akka.actor,
+      Pekko.actor,
       Akka.stream,
       Akka.persistence,
       Akka.cluster,
