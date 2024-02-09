@@ -21,12 +21,18 @@ class AkkaSerializationTest extends ScalaTestWithAkkaActorTestKit() with SpecAss
     val bytes             = akkaSerialization.serialize(event).get
     val serialized        = new String(bytes, StandardCharsets.UTF_8)
     expect(
-      serialized === """{"ref":"akka://AkkaSerializationTest@26.255.0.4:25520/user"}""",
+      serialized === """{"ref":"akka://AkkaSerializationTest@26.255.0.5:25520/user"}""",
+    )
+    val deserialized = akkaSerialization.deserialize(bytes, 9001, classOf[AkkaSampleEvent].getName).get
+    expect(
+      deserialized === event
     )
   }
 }
 
 class PekkoDeserializationTest extends ScalaTestWithPekkoActorTestKit() with SpecAssertions with AnyFunSuiteLike {
+
+  import org.apache.pekko.actor.typed.scaladsl.adapter._
 
   test("Deserialize ActorRef with Pekko") {
     val pekkoSerializationExtension = PekkoSerializationExtension(system)
