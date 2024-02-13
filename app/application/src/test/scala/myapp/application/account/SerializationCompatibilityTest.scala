@@ -31,6 +31,18 @@ class AkkaSerializationTest extends ScalaTestWithAkkaActorTestKit() with SpecAss
 //    )
   }
 
+  test("Serialize typed ActorRef in Akka") {
+    val akkaSerialization = AkkaSerializationExtension(system)
+    val actorRef          = system.ref
+    val event             = AkkaTypedActorRef(actorRef)
+    val bytes             = akkaSerialization.serialize(event).get
+    val serialized        = new String(bytes, StandardCharsets.UTF_8)
+    println(serialized)
+    expect(
+      serialized === """{"ref":"akka://AkkaSerializationTest@26.255.0.4:25520/user"}""",
+    )
+  }
+
   test("Serialize FiniteDuration in Akka") {
     val akkaSerializationExtension = AkkaSerializationExtension(system)
     val finiteDuration             = 42.nanos + 42.micros + 42.millis + 42.seconds + 42.minutes + 42.hours
@@ -55,6 +67,20 @@ class PekkoDeserializationTest extends ScalaTestWithPekkoActorTestKit() with Spe
         .deserialize(serialized.getBytes(StandardCharsets.UTF_8), 9002, classOf[PekkoActorRef].getName).get
     expect(
       deserialized === PekkoActorRef(system.deadLetters.toClassic),
+    )
+  }
+
+  test("Deserialize typed ActorRef which is serialized by Akka in Pekko") {
+    val serialized = """{"ref":"akka://AkkaSerializationTest@26.255.0.4:25520/user"}"""
+    val deserialized =
+      pekkoSerializationExtension
+        .deserialize(
+          serialized.getBytes(StandardCharsets.UTF_8),
+          9002,
+          classOf[PekkoTypedActorRef[Nothing]].getName,
+        ).get
+    expect(
+      deserialized === PekkoTypedActorRef(system.deadLetters),
     )
   }
 
