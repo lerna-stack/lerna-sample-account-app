@@ -22,7 +22,7 @@ object Dependencies {
     val wireMock                 = "2.30.1"
     val scalaMock                = "5.1.0"
     val akkaManagement           = "1.0.10"
-    val pekko = "1.0.2"
+    val pekko                    = "1.0.2"
   }
 
   object Lerna {
@@ -55,8 +55,8 @@ object Dependencies {
   }
 
   object Pekko {
-    val actor = "org.apache.pekko" %% "pekko-actor-typed" % Versions.pekko
-    val actorTestKit = "org.apache.pekko" %% "pekko-actor-testkit-typed" % Versions.pekko
+    val actor                = "org.apache.pekko" %% "pekko-actor-typed"           % Versions.pekko
+    val actorTestKit         = "org.apache.pekko" %% "pekko-actor-testkit-typed"   % Versions.pekko
     val serializationJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % Versions.pekko
   }
 

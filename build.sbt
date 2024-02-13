@@ -135,7 +135,7 @@ lazy val `application` = (project in file("app/application"))
       AkkaProjection.slick,
       SprayJson.sprayJson,
       Akka.actorTestKit       % Test,
-      Pekko.actorTestKit % Test,
+      Pekko.actorTestKit      % Test,
       Akka.multiNodeTestKit   % Test,
       Akka.streamTestKit      % Test,
       Akka.persistenceTestKit % Test,
