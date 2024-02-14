@@ -130,6 +130,8 @@ lazy val `application` = (project in file("app/application"))
       Akka.persistenceQuery,
       Akka.serializationJackson,
       Pekko.serializationJackson,
+      Akka.stream,
+      Pekko.stream,
       AkkaPersistenceCassandra.akkaPersistenceCassandra,
       AkkaProjection.eventsourced,
       AkkaProjection.slick,

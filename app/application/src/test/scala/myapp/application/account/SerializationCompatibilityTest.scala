@@ -2,10 +2,12 @@ package myapp.application.account
 
 import akka.actor.testkit.typed.scaladsl.{ ScalaTestWithActorTestKit => ScalaTestWithAkkaActorTestKit }
 import akka.serialization.{ SerializationExtension => AkkaSerializationExtension }
+import akka.stream.scaladsl.{ Sink, StreamRefs => AkkaStreamRefs }
 import myapp.utility.scalatest.SpecAssertions
 import org.apache.pekko.actor.Address
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ ScalaTestWithActorTestKit => ScalaTestWithPekkoActorTestKit }
-import org.apache.pekko.serialization.{ Serialization, SerializationExtension => PekkoSerializationExtension }
+import org.apache.pekko.serialization.{ SerializationExtension => PekkoSerializationExtension }
+import org.apache.pekko.stream.impl.streamref.SinkRefImpl
 import org.scalatest.funsuite.AnyFunSuiteLike
 
 import java.nio.charset.StandardCharsets
@@ -61,6 +63,14 @@ class AkkaSerializationTest extends ScalaTestWithAkkaActorTestKit() with SpecAss
     println(serialized)
     expect(serialized === """{"duration":"PT42H42M42.042042042S"}""")
   }
+
+  test("Serialize SinkRef in Akka") {
+    val sinkRef    = AkkaStreamRefs.sinkRef().to(Sink.fold[String, String]("")(_ + _)).run()
+    val event      = AkkaSinkRef(sinkRef)
+    val bytes      = akkaSerializationExtension.serialize(event).get
+    val serialized = new String(bytes, StandardCharsets.UTF_8)
+    println(serialized)
+  }
 }
 
 class PekkoDeserializationTest extends ScalaTestWithPekkoActorTestKit() with SpecAssertions with AnyFunSuiteLike {
@@ -114,5 +124,14 @@ class PekkoDeserializationTest extends ScalaTestWithPekkoActorTestKit() with Spe
     println(deserialized)
     val finiteDuration = 42.nanos + 42.micros + 42.millis + 42.seconds + 42.minutes + 42.hours
     expect(deserialized === PekkoFiniteDuration(finiteDuration))
+  }
+
+  test("Deserialize SinkRef which is serialized by Akka in Pekko") {
+    val serialized =
+      """{"sinkRef":"akka://AkkaSerializationTest@26.255.0.5:25520/system/Materializers/StreamSupervisor-0/$$a-SourceRef-0#-1784691012"}"""
+    val deserialized = pekkoSerializationExtension
+      .deserialize(serialized.getBytes(StandardCharsets.UTF_8), 9002, classOf[PekkoSinkRef[Nothing]].getName).get
+    println(deserialized)
+    expect(deserialized.toString === "PekkoSinkRef(SinkRefImpl(Actor[pekko://PekkoDeserializationTest/deadLetters]))")
   }
 }

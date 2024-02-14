@@ -58,6 +58,7 @@ object Dependencies {
     val actor                = "org.apache.pekko" %% "pekko-actor-typed"           % Versions.pekko
     val actorTestKit         = "org.apache.pekko" %% "pekko-actor-testkit-typed"   % Versions.pekko
     val serializationJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % Versions.pekko
+    val stream               = "org.apache.pekko" %% "pekko-stream"                % Versions.pekko
   }
 
   object AkkaHttp {
