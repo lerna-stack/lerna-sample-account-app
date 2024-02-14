@@ -1,7 +1,7 @@
 package myapp.application.account
 
-import akka.actor.{ typed, ActorRef, Address }
-import akka.stream.SinkRef
+import akka.actor.{ActorRef, Address, typed}
+import akka.stream.{SinkRef, SourceRef}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -15,3 +15,5 @@ final case class AkkaAddress(address: Address) extends AkkaSerializationCompatib
 final case class AkkaFiniteDuration(duration: FiniteDuration) extends AkkaSerializationCompatibilityEvent
 
 final case class AkkaSinkRef[A](sinkRef: SinkRef[A]) extends AkkaSerializationCompatibilityEvent
+
+final case class AkkaSourceRef[A](sourceRef: SourceRef[A]) extends AkkaSerializationCompatibilityEvent

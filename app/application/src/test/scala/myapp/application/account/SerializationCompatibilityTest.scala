@@ -1,13 +1,12 @@
 package myapp.application.account
 
-import akka.actor.testkit.typed.scaladsl.{ ScalaTestWithActorTestKit => ScalaTestWithAkkaActorTestKit }
-import akka.serialization.{ SerializationExtension => AkkaSerializationExtension }
-import akka.stream.scaladsl.{ Sink, StreamRefs => AkkaStreamRefs }
+import akka.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit => ScalaTestWithAkkaActorTestKit}
+import akka.serialization.{SerializationExtension => AkkaSerializationExtension}
+import akka.stream.scaladsl.{Sink, Source, StreamRefs => AkkaStreamRefs}
 import myapp.utility.scalatest.SpecAssertions
 import org.apache.pekko.actor.Address
-import org.apache.pekko.actor.testkit.typed.scaladsl.{ ScalaTestWithActorTestKit => ScalaTestWithPekkoActorTestKit }
-import org.apache.pekko.serialization.{ SerializationExtension => PekkoSerializationExtension }
-import org.apache.pekko.stream.impl.streamref.SinkRefImpl
+import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit => ScalaTestWithPekkoActorTestKit}
+import org.apache.pekko.serialization.{SerializationExtension => PekkoSerializationExtension}
 import org.scalatest.funsuite.AnyFunSuiteLike
 
 import java.nio.charset.StandardCharsets
@@ -67,6 +66,15 @@ class AkkaSerializationTest extends ScalaTestWithAkkaActorTestKit() with SpecAss
   test("Serialize SinkRef in Akka") {
     val sinkRef    = AkkaStreamRefs.sinkRef().to(Sink.fold[String, String]("")(_ + _)).run()
     val event      = AkkaSinkRef(sinkRef)
+    val bytes      = akkaSerializationExtension.serialize(event).get
+    val serialized = new String(bytes, StandardCharsets.UTF_8)
+    println(serialized)
+  }
+
+  test("Serialize SourceRef in Akka") {
+    val source = Source(1 to 10)
+    val sourceRef = source.runWith(AkkaStreamRefs.sourceRef())
+    val event = AkkaSourceRef(sourceRef)
     val bytes      = akkaSerializationExtension.serialize(event).get
     val serialized = new String(bytes, StandardCharsets.UTF_8)
     println(serialized)
@@ -133,5 +141,13 @@ class PekkoDeserializationTest extends ScalaTestWithPekkoActorTestKit() with Spe
       .deserialize(serialized.getBytes(StandardCharsets.UTF_8), 9002, classOf[PekkoSinkRef[Nothing]].getName).get
     println(deserialized)
     expect(deserialized.toString === "PekkoSinkRef(SinkRefImpl(Actor[pekko://PekkoDeserializationTest/deadLetters]))")
+  }
+
+  test("Deserialize SourceRef which is serialized by Akka in Pekko") {
+    val serialized = """{"sourceRef":"akka://AkkaSerializationTest@26.255.0.5:25520/system/Materializers/StreamSupervisor-0/$$a-SinkRef-0#173271150"}"""
+    val deserialized = pekkoSerializationExtension
+      .deserialize(serialized.getBytes(StandardCharsets.UTF_8), 9002, classOf[PekkoSourceRef[Nothing]].getName).get
+    println(deserialized)
+    expect(deserialized.toString === "PekkoSourceRef(SourceRefImpl(Actor[pekko://PekkoDeserializationTest/deadLetters]))")
   }
 }
